@@ -1,0 +1,546 @@
+#****This must be run in the root of the project (where the journals/ directory is) for the hledger command to find the journal file(s)********
+# To run: .\venv\Scripts\Activate
+# Then: uvicorn app:app --reload
+# Go to http://127.0.0.1:8000/
+
+import cmd
+from importlib.metadata import files
+from fastapi import FastAPI, HTTPException, Request,UploadFile, File, Form
+
+from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from collections import OrderedDict
+from collections import defaultdict
+import subprocess
+import json
+from datetime import datetime
+from pathlib import Path
+import hashlib
+import os
+import re
+import tempfile
+
+app = FastAPI()
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+JOURNAL = "journals/main.journal"
+JOURNAL_DIR = Path("journals")
+DATA_DIR = Path("data")
+RULES_DIR = Path("rules")
+
+#************** Helper functions *************************** 
+def hledger(args, files=None):
+    if files is None:
+        files = [JOURNAL]
+    
+    cmd = ["hledger"]
+    for f in files:
+        cmd.extend(["-f", f])
+    cmd.extend(args)
+
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(p.stderr)
+    return p.stdout
+
+def build_register_transactions(rows, account_filter=None):
+    grouped = group_register_rows(rows)
+    transactions = []
+
+    for txid, tx_rows in grouped.items():
+        # Use first row for shared fields
+        first = tx_rows[0]
+        date = first[0]
+        description = first[2]
+
+        postings = []
+        comments = []
+
+        for row in tx_rows:
+            p = row[3]
+            postings.append(p)
+            if p.get("pcomment"):
+                comments.append(p["pcomment"])
+
+        # Choose primary posting
+        # Primary posting = the posting for THIS register row
+        primary = row[3]
+
+        # Amount from primary posting
+        amount = [
+            {
+                "commodity": a["acommodity"],
+                "quantity": a["aquantity"]["floatingPoint"],
+            }
+            for a in primary["pamount"]
+        ]
+
+        # Running balance from register row (last column)
+        balance = [
+            {
+                "commodity": a["acommodity"],
+                "quantity": a["aquantity"]["floatingPoint"],
+            }
+            for a in first[4]
+        ]
+
+        # Other accounts = all accounts in this transaction except the primary
+        other_accounts = []
+
+        for row in tx_rows:
+            p = row[3]
+
+            if p["paccount"] == primary["paccount"]:
+                continue
+
+            amounts = [
+                {
+                    "commodity": a["acommodity"],
+                    "quantity": a["aquantity"]["floatingPoint"],
+                    "cost": (
+                        {
+                            "commodity": a["acost"]["acommodity"],
+                            "quantity": a["acost"]["aquantity"]["floatingPoint"],
+                        }
+                        if a["acost"] else None
+                    )
+                }
+                for a in p["pamount"]
+            ]
+
+            other_accounts.append({
+                "account": p["paccount"],
+                "amount": amounts
+            })
+
+
+        transactions.append({
+            "id": txid,
+            "date": date,
+            "description": description,
+            "account": primary["paccount"],
+            "amount": amount,
+            "balance": balance,
+            "comment": "; ".join(comments),
+            "other_accounts": other_accounts,
+        })
+
+    # Preserve register order
+    return sorted(transactions, key=lambda t: (t["date"], t["id"]))
+
+def parse_hledger_rows(rows):
+    tree = []
+    stack = []  # track parent nodes
+
+    for row in rows:
+        full_name, display_name, depth, amounts = row
+        node = {
+            "name": display_name,
+            "account": full_name,
+            "balance": [
+                { "commodity": a["acommodity"], "quantity": a["aquantity"]["floatingPoint"] }
+                for a in amounts
+            ],
+            "accounts": []
+        } 
+
+        # manage hierarchy using depth
+        while stack and stack[-1][1] >= depth:
+            stack.pop()
+
+        if stack:
+            parent_node = stack[-1][0]
+            parent_node["accounts"].append(node)
+        else:
+            tree.append(node)
+
+        stack.append((node, depth))
+
+    return tree
+
+def group_register_rows(rows):
+    grouped = defaultdict(list)
+    for row in rows:
+        txid = row[3]["ptransaction_"]
+        grouped[txid].append(row)
+    return grouped
+
+def get_edit_metadata(tx):
+    positions = tx.get("tsourcepos") or []
+    if not positions:
+        return None
+
+    source_path = Path(positions[0]["sourceName"]).resolve()
+    try:
+        journal_name = source_path.relative_to(JOURNAL_DIR.resolve()).as_posix()
+    except ValueError:
+        return None
+
+    line_start = positions[0]["sourceLine"]
+    line_end = positions[-1]["sourceLine"] - 1
+    with source_path.open("r", encoding="utf-8", newline="") as journal_file:
+        lines = journal_file.read().splitlines()
+    if line_start < 1 or line_end < line_start or line_end > len(lines):
+        return None
+
+    entry = "\n".join(lines[line_start - 1:line_end])
+    return {
+        "journal": journal_name,
+        "line_start": line_start,
+        "line_end": line_end,
+        "content": entry,
+        "original_hash": hashlib.sha256(entry.encode("utf-8")).hexdigest(),
+    }
+
+def validate_journal_entry_content(entry):
+    if not isinstance(entry, str):
+        raise HTTPException(status_code=400, detail="Transaction text is required")
+
+    entry = entry.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
+    if not re.match(r"^\d{4}-\d{2}-\d{2}(?:\s|$)", entry):
+        raise HTTPException(status_code=400, detail="Entry must begin with a dated transaction")
+    if re.search(r"\n\d{4}-\d{2}-\d{2}(?:\s|$)", entry):
+        raise HTTPException(status_code=400, detail="Enter only one transaction at a time")
+
+    validation = subprocess.run(
+        ["hledger", "print", "-f", "-", "-O", "json"],
+        input=entry,
+        capture_output=True,
+        text=True,
+    )
+    if validation.returncode != 0:
+        raise HTTPException(status_code=400, detail=validation.stderr.strip())
+    try:
+        parsed_entries = json.loads(validation.stdout)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="hledger could not parse this entry")
+    if len(parsed_entries) != 1:
+        raise HTTPException(status_code=400, detail="Enter only one transaction at a time")
+    return entry
+
+def resolve_data_file(directory, filename):
+    if not isinstance(filename, str) or Path(filename).name != filename:
+        raise HTTPException(status_code=404, detail="File not found")
+    root = directory.resolve()
+    file_path = (root / filename).resolve()
+    if file_path.parent != root or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return file_path
+
+# API Endpoints ***************************
+@app.get("/balance")
+def balance(
+    journals: str | None = None,
+    begin: str | None = None,
+    end: str | None = None,
+    depth: int | None = None,
+):
+    files = [f"journals/{j}" for j in journals.split(',')] if journals else [JOURNAL]
+    args = ["balance", "--tree", "--empty", "-O", "json"]
+
+    if begin:
+        args += ["--begin", begin]
+    if end:
+        args += ["--end", end]
+    if depth:
+        args += ["--depth", str(depth)]
+
+    out = hledger(args, files)
+    rows = json.loads(out)
+    tree = parse_hledger_rows(rows[0])  # the outermost array
+    return tree
+
+@app.get("/journals")
+def list_journals():
+    import os
+    journals_dir = "journals"
+    if os.path.exists(journals_dir):
+        files = [f for f in os.listdir(journals_dir) if not f.startswith('.')]
+        return {"journals": files}
+    return {"journals": []}
+
+@app.get("/register")
+def register(
+    journals: str | None = None,
+    account: str | None = None,
+    begin: str | None = None,
+    end: str | None = None,
+):
+    files = [f"journals/{j}" for j in journals.split(',')] if journals else [JOURNAL]
+    args = ["register", "-O", "json"]
+
+    if account:
+        args.append(account)
+    if begin:
+        args += ["--begin", begin]
+    if end:
+        args += ["--end", end]
+
+    raw = hledger(args, files)  # get raw JSON output
+    rows = json.loads(raw) # parse JSON
+
+    transactionsOut = build_register_transactions(rows, account_filter=account)
+
+    return transactionsOut
+
+@app.get("/", response_class=HTMLResponse)
+def dashboard(request: Request):
+    return templates.TemplateResponse(
+        "dashboard.html",
+        {"request": request}
+    )
+
+@app.get("/add-data", response_class=HTMLResponse)
+def add_data(request: Request):
+    return templates.TemplateResponse(
+        "add-data.html",
+        {"request": request}
+    )
+
+@app.get("/journal")
+def journal(
+    journals: str | None = None,
+    account: str | None = None,
+    match: str | None = None,
+   # begin: str | None = None,
+   # end: str | None = None,
+    query: str | None = None,
+):
+    files = [f"journals/{j}" for j in journals.split(',')] if journals else [JOURNAL]
+    args = ["print", "--output-format=json"]
+
+    if account:
+        args.append(account)
+    if match:
+        args += ["-m ", match]
+    if query:
+        args.append(query)
+
+    out = hledger(args, files)
+    txs = json.loads(out)
+
+    results = []
+
+    for tx in txs:
+        date = tx["tdate"]
+        desc = tx["tdescription"]
+        postings = tx["tpostings"]
+
+        # Filtering
+        #if account and not any(p["paccount"] == account for p in postings):
+        #    continue
+        #if query and query.lower() not in desc.lower():
+        #    continue
+
+        results.append({
+            "date": date,
+            "description": desc,
+            "comment": tx.get("tcomment", ""),
+            "edit": get_edit_metadata(tx),
+            "postings": [
+                {
+                    "account": p["paccount"],
+                    "amount": [
+                        {
+                            "commodity": a["acommodity"],
+                            "quantity": a["aquantity"]["floatingPoint"],
+                            "cost": (
+                                {
+                                    "commodity": a["acost"]["acommodity"],
+                                    "quantity": a["acost"]["aquantity"]["floatingPoint"],
+                                }
+                                if a["acost"] else None
+                            )
+                        }
+                        for a in p["pamount"]
+                    ],
+                }
+                for p in postings
+            ]
+        })
+
+    return results
+
+@app.post("/journal/edit")
+async def edit_journal_entry(request: Request):
+    data = await request.json()
+    journal_name = data.get("journal")
+    if not isinstance(journal_name, str):
+        raise HTTPException(status_code=400, detail="Invalid journal path")
+
+    journal_root = JOURNAL_DIR.resolve()
+    journal_path = (journal_root / journal_name).resolve()
+    try:
+        journal_path.relative_to(journal_root)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid journal path")
+    if not journal_path.is_file():
+        raise HTTPException(status_code=404, detail="Journal file not found")
+
+    line_start = data.get("line_start")
+    line_end = data.get("line_end")
+    original_hash = data.get("original_hash")
+    edited_entry = data.get("content")
+    if (
+        not isinstance(line_start, int) or isinstance(line_start, bool) or line_start < 1
+        or not isinstance(line_end, int) or isinstance(line_end, bool) or line_end < line_start
+        or not isinstance(original_hash, str)
+    ):
+        raise HTTPException(status_code=400, detail="Invalid edit request")
+
+    edited_entry = validate_journal_entry_content(edited_entry)
+
+    with journal_path.open("r", encoding="utf-8", newline="") as journal_file:
+        original_content = journal_file.read()
+    lines = original_content.splitlines(keepends=True)
+    if line_end > len(lines):
+        raise HTTPException(status_code=409, detail="Journal changed; reload before editing")
+
+    original_entry = "".join(lines[line_start - 1:line_end])
+    normalized_original = original_entry.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
+    current_hash = hashlib.sha256(normalized_original.encode("utf-8")).hexdigest()
+    if current_hash != original_hash:
+        raise HTTPException(status_code=409, detail="Journal entry changed; reload before editing")
+
+    newline = "\r\n" if "\r\n" in original_content else "\n"
+    replacement = edited_entry.replace("\n", newline)
+    if original_entry.endswith(("\n", "\r")):
+        replacement += newline
+    updated_content = (
+        "".join(lines[:line_start - 1])
+        + replacement
+        + "".join(lines[line_end:])
+    )
+
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="", dir=journal_path.parent,
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_file.write(updated_content)
+        os.replace(temp_path, journal_path)
+    finally:
+        if temp_path and temp_path.exists():
+            temp_path.unlink()
+
+    return {"success": True}
+
+@app.post("/journal/add")
+async def add_journal_entry(request: Request):
+    data = await request.json()
+    journal_name = data.get("journal") if isinstance(data, dict) else None
+    if not isinstance(journal_name, str) or not journal_name.endswith(".journal"):
+        raise HTTPException(status_code=400, detail="Invalid destination journal")
+
+    journal_root = JOURNAL_DIR.resolve()
+    journal_path = (journal_root / journal_name).resolve()
+    try:
+        journal_path.relative_to(journal_root)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid destination journal")
+    if not journal_path.is_file():
+        raise HTTPException(status_code=404, detail="Destination journal not found")
+
+    entry = validate_journal_entry_content(data.get("content"))
+    with journal_path.open("r", encoding="utf-8", newline="") as journal_file:
+        current_content = journal_file.read()
+
+    newline = "\r\n" if "\r\n" in current_content else "\n"
+    prefix = current_content
+    if prefix and not prefix.endswith(("\n", "\r")):
+        prefix += newline
+    if prefix and not prefix.endswith(newline + newline):
+        prefix += newline
+
+    with journal_path.open("a", encoding="utf-8", newline="") as journal_file:
+        journal_file.write(prefix[len(current_content):])
+        journal_file.write(entry.replace("\n", newline) + newline)
+
+    return {"success": True, "journal": journal_name}
+
+@app.get("/get-rules")
+def get_rules():
+    if RULES_DIR.exists():
+        files = [path.name for path in RULES_DIR.iterdir() if path.is_file() and not path.name.startswith('.')]
+        return {"rules": files}
+    return {"rules": []}
+
+@app.get("/rules/{filename}", response_class=PlainTextResponse)
+def read_rule_file(filename: str):
+    return resolve_data_file(RULES_DIR, filename).read_text(encoding="utf-8")
+
+@app.get("/get-data-files")
+def get_data_files():
+    if DATA_DIR.exists():
+        files = [path.name for path in DATA_DIR.iterdir() if path.is_file() and not path.name.startswith('.')]
+        return {"data-files": files}
+    return {"data-files": []}
+
+@app.get("/data-files/{filename}", response_class=PlainTextResponse)
+def read_data_file(filename: str):
+    return resolve_data_file(DATA_DIR, filename).read_text(encoding="utf-8")
+
+@app.post("/import")
+async def import_data(
+    file: str = Form(...),
+    rule: str = Form(...),
+    journal: str = Form("main.journal"),
+    dry_run: bool = Form(False),
+):
+    if os.path.basename(journal) != journal or not journal.endswith(".journal"):
+        return {"success": False, "message": "Invalid destination journal"}
+
+    try:
+        file_path = resolve_data_file(DATA_DIR, file)
+        rule_path = resolve_data_file(RULES_DIR, rule)
+    except HTTPException as error:
+        return {"success": False, "message": error.detail}
+    journal_path = f"journals/{journal}"
+
+    with open(journal_path, "r", encoding="utf-8") as journal_file:
+        journal_before_import = journal_file.read()
+  
+    cmd = ["hledger", "import", "-f", journal_path, str(file_path), "--rules", str(rule_path)]
+    if dry_run:
+        cmd.append("--dry-run")
+    p = subprocess.run(cmd, capture_output=True, text=True)
+    if p.returncode != 0:
+        return {"success": False, "message": p.stderr}
+
+    import_comment = None
+    if not dry_run:
+        result = (p.stderr.strip() or p.stdout.strip() or "transactions imported")
+        result = " ".join(result.split())
+        timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
+        import_comment = (
+            f"# Import completed {timestamp}: source={file}, rules={rule}, \n"
+            f"# result={result}\n"
+        )
+        with open(journal_path, "r", encoding="utf-8") as journal_file:
+            journal_after_import = journal_file.read()
+
+        if journal_after_import.startswith(journal_before_import):
+            imported_data = journal_after_import[len(journal_before_import):].lstrip("\r\n")
+            journal_content = journal_before_import
+            if journal_content and not journal_content.endswith("\n"):
+                journal_content += "\n"
+            journal_content += f"\n{import_comment}{imported_data}"
+            with open(journal_path, "w", encoding="utf-8") as journal_file:
+                journal_file.write(journal_content)
+
+    return {
+        "success": True,
+        "file": file,
+        "journal": journal,
+        "output": p.stdout,
+        "message": p.stderr,
+        "comment": import_comment,
+    }
+
+    
+

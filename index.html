@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hledger UI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <h1>Accounts</h1>
+  <pre id="accounts">Loading...</pre>
+
+  <h1>Register</h1>
+  <pre id="register">Loading...</pre>
+
+  <script>
+    async function loadAccounts() {
+      const res = await fetch('http://127.0.0.1:8000/accounts');
+      const data = await res.json();
+      document.getElementById('accounts').textContent = JSON.stringify(data, null, 2);
+    }
+
+    async function loadRegister() {
+      const res = await fetch('http://127.0.0.1:8000/register');
+      const data = await res.json();
+      document.getElementById('register').textContent = JSON.stringify(data, null, 2);
+    }
+
+    loadAccounts();
+    loadRegister();
+  </script>
+</body>
+</html>

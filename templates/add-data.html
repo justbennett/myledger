@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<!--Jinja Macro-->
+{% macro help_icon(link, title="Help") -%} 
+  <span title="{{ title }}"><a href="{{ link }}" target="_blank">⍰</a></span>
+{%- endmacro %}
+
+<html>
+<head>
+  <title>Hledger UI</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <link rel="icon" type="image/png" href="/static/favicon.ico">
+</head>
+<body>
+  <header>
+    <h1>Add Data</h1>
+  </header>
+    <main>
+    <div id="upload-flow-container">
+        <div id="csv-uploader">
+          <h2>Import New Data {{ help_icon('https://hledger.org/ui-docs/csv-import.html', "Select CSV file to import transaction data") }}</h2>
+            <div >
+              <button id="data-toggle" class="select-toggle dark" >Select Data File</button>
+              <select id="data-select" class="list-select" multiple style="display: none;">
+              <!-- options populated by JS -->
+              </select>
+            </div>
+            <div>
+              <label for="upload-data-input">
+                or select a CSV file to upload:
+              </label>
+              <input type="file" id="upload-data-input" accept=".csv"/>
+            </div>
+            <div id="data-viewer" style="display: none;">
+              <pre id="data-details"></pre>
+              <object id="file-preview" class="file-preview"type="text/plain" >
+                Your browser does not support displaying the data file.</object>
+            </div>
+        <div id="upload-status"></div>
+      </div>
+      
+    </div>
+        <div id = "rules-selector">
+          <h2>Import Rules {{ help_icon('https://hledger.org/1.52/hledger.html#working-with-csv', "Select which rules to apply") }}</h2>
+            <div >
+              <button id="rules-toggle" class="select-toggle dark" >Select Rules File</button>
+              <select id="rules-select" class="list-select" multiple style="display: none;">
+              <!-- options populated by JS -->
+              </select>
+            </div>
+
+            <div id="rules-viewer" style="display: none;" >
+              <pre id="rule-details"></pre>
+              <object id = "rule-content" class ="file-preview" type="text/plain" >
+                Your browser does not support displaying the rule file.</object>
+            </div>
+        </div>
+        <div>
+          <h2>Destination Journal</h2>
+          <button id="journal-toggle" class="select-toggle dark" type="button">Select Journal</button>
+          <select id="journal-select" class="list-select" style="display: none;"></select>
+          <div id="journal-viewer" style="display: none;">
+            <pre id="journal-details"></pre>
+          </div>
+        </div>
+        <div>
+          
+          <h2>Dry Run Results</h2>
+          <button id="dry-run" class="dark">Execute Dry Run</button>
+          <button id="import-data" class="dark" type="button" disabled style="display: none;">Import Data</button>
+          <div id="dry-run-results" style="display: none;">
+            <pre id="dry-run-details"></pre>
+          </div>
+        </div>
+    </div>
+    </main>
+    {% include 'footer.html' %}
+    <script src="/static/js/add-data.js?v=3"></script>
+</body>
+</html>
+

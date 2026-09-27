@@ -1,0 +1,6 @@
+skip 1
+fields date, description, amount
+date-format %Y-%m-%d
+account1 assets:checking
+account2 expenses:sample
+amount %amount

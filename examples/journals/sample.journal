@@ -1,0 +1,7 @@
+2026-01-01 * Opening balance
+    assets:checking  $100.00
+    equity:opening-balances  $-100.00
+
+2026-01-02 * Sample purchase
+    expenses:food  $4.50
+    assets:checking
