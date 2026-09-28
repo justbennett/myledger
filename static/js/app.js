@@ -338,6 +338,7 @@ function openJournalEditor(edit) {
   activeJournalEdit = edit;
   document.getElementById("journal-editor-title").textContent = "Edit Journal Entry";
   document.getElementById("journal-editor-destination").hidden = true;
+  document.getElementById("journal-destination").disabled = true;
   document.getElementById("journal-editor-save").textContent = "Save entry";
   document.getElementById("journal-entry-content").value = edit.content;
   document.getElementById("journal-editor-status").textContent = "";
@@ -350,7 +351,11 @@ async function openAddJournalEntry() {
   const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
   const status = document.getElementById("journal-editor-status");
   const destination = document.getElementById("journal-destination");
+  const saveButton = document.getElementById("journal-editor-save");
   status.textContent = "";
+  destination.disabled = false;
+  destination.required = true;
+  saveButton.disabled = true;
 
   try {
     const response = await fetch("/journals");
@@ -378,10 +383,11 @@ async function openAddJournalEntry() {
     document.getElementById("journal-editor-save").textContent = "Add entry";
     document.getElementById("journal-entry-content").value =
       `${date} description ; comment\n    account1 $AMT\n    account2 $AMT`;
-    document.getElementById("journal-editor-save").disabled = false;
+    saveButton.disabled = false;
     document.getElementById("journal-editor").showModal();
   } catch (error) {
     status.textContent = error.message;
+    saveButton.disabled = true;
     document.getElementById("journal-editor-title").textContent = "Add Journal Entry";
     document.getElementById("journal-editor").showModal();
   }

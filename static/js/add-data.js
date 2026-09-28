@@ -178,6 +178,10 @@ async function runImport({ dryRun = false, file, rule, journal } = {}) {
 // -------------------------
 document.getElementById('upload-data-input')?.addEventListener('change', async (event) => {
   const file = event.target.files[0];
+  const uploadButton = document.getElementById('upload-csv');
+  const status = document.getElementById('upload-status');
+  uploadButton.disabled = !file;
+  status.textContent = file ? `${file.name} selected. Upload it to use it for import.` : '';
   if (!file) return;
   const text = await file.text();
   const preview = document.getElementById('file-preview');
@@ -195,6 +199,46 @@ document.getElementById('upload-data-input')?.addEventListener('change', async (
     preview.dataset.blobUrl = url;
   }
   if (viewer) viewer.style.display = 'block';
+  document.getElementById('data-details').textContent = file.name;
+});
+
+document.getElementById('upload-csv')?.addEventListener('click', async () => {
+  const input = document.getElementById('upload-data-input');
+  const uploadButton = document.getElementById('upload-csv');
+  const status = document.getElementById('upload-status');
+  const file = input.files[0];
+  if (!file) return;
+
+  uploadButton.disabled = true;
+  status.textContent = `Uploading ${file.name}...`;
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch('/upload-data', { method: 'POST', body: formData });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || 'CSV upload failed');
+
+    const dataSelect = document.getElementById('data-select');
+    let option = Array.from(dataSelect.options).find((item) => item.value === result.file);
+    if (!option) {
+      option = document.createElement('option');
+      option.value = result.file;
+      option.textContent = result.file;
+      dataSelect.appendChild(option);
+    }
+    Array.from(dataSelect.options).forEach((item) => { item.selected = false; });
+    option.selected = true;
+    pendingImport = null;
+    const importButton = document.getElementById('import-data');
+    importButton.disabled = true;
+    importButton.style.display = 'none';
+    status.textContent = `${result.file} uploaded. Select an import rule and destination journal, then execute a dry run.`;
+    input.value = '';
+  } catch (error) {
+    status.textContent = error.message;
+    uploadButton.disabled = false;
+  }
 });
 
 document.getElementById('dry-run')?.addEventListener('click', async () => {

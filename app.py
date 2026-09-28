@@ -41,7 +41,7 @@ def hledger(args, files=None):
         cmd.extend(["-f", f])
     cmd.extend(args)
 
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    p = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
     if p.returncode != 0:
         raise RuntimeError(p.stderr)
     return p.stdout
@@ -210,6 +210,7 @@ def validate_journal_entry_content(entry):
         input=entry,
         capture_output=True,
         text=True,
+        errors="replace",
     )
     if validation.returncode != 0:
         raise HTTPException(status_code=400, detail=validation.stderr.strip())
@@ -485,6 +486,35 @@ def get_data_files():
 def read_data_file(filename: str):
     return resolve_data_file(DATA_DIR, filename).read_text(encoding="utf-8")
 
+@app.post("/upload-data")
+async def upload_data(file: UploadFile = File(...)):
+    filename = file.filename
+    if (
+        not filename
+        or Path(filename).name != filename
+        or filename.startswith(".")
+        or Path(filename).suffix.lower() != ".csv"
+    ):
+        raise HTTPException(status_code=400, detail="Choose a valid CSV file")
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    destination = DATA_DIR / filename
+    try:
+        contents = await file.read()
+        if not contents:
+            raise HTTPException(status_code=400, detail="The selected CSV file is empty")
+        with destination.open("xb") as destination_file:
+            destination_file.write(contents)
+    except FileExistsError:
+        raise HTTPException(
+            status_code=409,
+            detail="A file with this name already exists in data. Select it from the existing data files or rename the upload.",
+        )
+    finally:
+        await file.close()
+
+    return {"success": True, "file": filename}
+
 @app.post("/import")
 async def import_data(
     file: str = Form(...),
@@ -508,7 +538,7 @@ async def import_data(
     cmd = ["hledger", "import", "-f", journal_path, str(file_path), "--rules", str(rule_path)]
     if dry_run:
         cmd.append("--dry-run")
-    p = subprocess.run(cmd, capture_output=True, text=True)
+    p = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
     if p.returncode != 0:
         return {"success": False, "message": p.stderr}
 

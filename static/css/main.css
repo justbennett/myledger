@@ -476,6 +476,10 @@ section h2 {
   gap: 0.35rem;
 }
 
+.journal-editor-destination[hidden] {
+  display: none;
+}
+
 #journal-destination {
   width: 100%;
   padding: 0.5rem;

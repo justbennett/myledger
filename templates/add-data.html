@@ -29,13 +29,14 @@
                 or select a CSV file to upload:
               </label>
               <input type="file" id="upload-data-input" accept=".csv"/>
+              <button type="button" id="upload-csv" class="dark" disabled>Upload CSV</button>
             </div>
             <div id="data-viewer" style="display: none;">
               <pre id="data-details"></pre>
               <object id="file-preview" class="file-preview"type="text/plain" >
                 Your browser does not support displaying the data file.</object>
             </div>
-        <div id="upload-status"></div>
+        <div id="upload-status" role="status" aria-live="polite"></div>
       </div>
       
     </div>
@@ -74,7 +75,7 @@
     </div>
     </main>
     {% include 'footer.html' %}
-    <script src="/static/js/add-data.js?v=3"></script>
+    <script src="/static/js/add-data.js?v=4"></script>
 </body>
 </html>
 
