@@ -31,6 +31,7 @@
       </div>
       <div id="accounts"></div>
     </section>
+
     <section id="main-view">
       <div class="journal-view-tabs" role="tablist" aria-label="Main views">
         <button type="button" id="journal-view-tab" class="journal-view-tab active" role="tab" aria-selected="true" aria-controls="journal-table-panel" tabindex="0">Journal</button>
@@ -122,7 +123,9 @@
         </table>
       </div>
     </section>
+
   </main>
+
   <dialog id="journal-editor" aria-labelledby="journal-editor-title">
     <form id="journal-editor-form">
       <div class="journal-editor-header">
@@ -145,6 +148,7 @@
       </div>
     </form>
   </dialog>
+  
   {% include 'footer.html' %}
   <script src="/static/js/vendor/chart.umd.min.js"></script>
   <script src="/static/js/app.js?v=2"></script>
