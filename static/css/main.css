@@ -371,6 +371,41 @@ li {
   color: #1e293b;
 }
 
+main.add-data-main {
+  display: block;
+}
+
+#upload-flow-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+#upload-flow-container > div {
+  flex: 0 1 22rem;
+  min-width: min(100%, 18rem);
+  max-width: 100%;
+}
+
+#dry-run-section {
+  width: 100%;
+  margin-top: 1.75rem;
+}
+
+#dry-run-results {
+  width: 100%;
+  overflow-x: auto;
+}
+
+#dry-run-details {
+  max-width: 100%;
+  overflow: auto;
+  white-space: pre;
+}
+
 /* make clear filter appear next to register heading */
 section h2 {
   display: inline;
@@ -417,6 +452,60 @@ section h2 {
 
 .journal-postings td {
   padding: 0.25rem 0.5rem;
+}
+
+.dry-run-view-tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0.75rem 0;
+  border-bottom: 1px solid #cbd5e1;
+}
+
+.dry-run-view-tab {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  color: #475569;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+}
+
+.dry-run-view-tab.active {
+  color: #0f625c;
+  border-bottom-color: #167d75;
+}
+
+#dry-run-preview-status {
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+#dry-run-journal-view[hidden],
+#dry-run-text-view[hidden] {
+  display: none;
+}
+
+.journal-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.journal-preview-table th,
+.journal-preview-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+  vertical-align: top;
+}
+
+.journal-preview-table .amount {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.dry-run-detail-row td {
+  background: #f8fafc;
 }
 
 .journal-row-actions {
@@ -555,6 +644,15 @@ section h2 {
 }
 
 @media (max-width: 520px) {
+  main.add-data-main {
+    padding: 1rem;
+  }
+
+  #upload-flow-container > div {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
   .main-view-toolbar {
     align-items: stretch;
     flex-wrap: wrap;
@@ -612,7 +710,8 @@ button {
   border: 1px solid #ccc;
   border-radius: 5px;
   margin-top: 1rem;
-  width: 600px;
+  width: 100%;
+  max-width: 600px;
   height: 150px;
 }
 

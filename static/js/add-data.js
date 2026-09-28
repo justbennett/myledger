@@ -173,6 +173,78 @@ async function runImport({ dryRun = false, file, rule, journal } = {}) {
 
   return data;
 }
+
+function formatJournalAmount(amounts) {
+  return amounts.map((amount) => {
+    const quantity = Number(amount.aquantity?.floatingPoint ?? 0);
+    return `${amount.acommodity || ""}${quantity.toLocaleString(undefined, { maximumFractionDigits: 6 })}`;
+  }).join(", ");
+}
+
+function renderDryRunJournal(transactions) {
+  const tbody = document.querySelector("#dry-run-journal-table tbody");
+  tbody.replaceChildren();
+
+  for (const transaction of transactions) {
+    const postings = transaction.tpostings || [];
+    const firstPosting = postings[0];
+    const row = document.createElement("tr");
+    const values = [
+      transaction.tdate || "",
+      transaction.tdescription || "",
+      firstPosting?.paccount || "",
+      firstPosting ? formatJournalAmount(firstPosting.pamount || []) : "",
+    ];
+    for (const value of values) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    }
+    row.lastElementChild.className = "amount";
+    tbody.appendChild(row);
+
+    if (transaction.tcomment || postings.length > 1) {
+      const detailsRow = document.createElement("tr");
+      detailsRow.className = "dry-run-detail-row";
+      const detailsCell = document.createElement("td");
+      detailsCell.colSpan = 4;
+      if (transaction.tcomment) {
+        const comment = document.createElement("p");
+        comment.className = "comment";
+        comment.textContent = transaction.tcomment.trim();
+        detailsCell.appendChild(comment);
+      }
+      const postingTable = document.createElement("table");
+      postingTable.className = "journal-postings";
+      for (const posting of postings.slice(1)) {
+        const postingRow = document.createElement("tr");
+        const accountCell = document.createElement("td");
+        accountCell.textContent = `↳ ${posting.paccount || ""}`;
+        const amountCell = document.createElement("td");
+        amountCell.className = "amount";
+        amountCell.textContent = formatJournalAmount(posting.pamount || []);
+        postingRow.append(accountCell, amountCell);
+        postingTable.appendChild(postingRow);
+      }
+      detailsCell.appendChild(postingTable);
+      detailsRow.appendChild(detailsCell);
+      tbody.appendChild(detailsRow);
+    }
+  }
+}
+
+function setDryRunView(view) {
+  const showJournal = view === "journal";
+  document.getElementById("dry-run-journal-view").hidden = !showJournal;
+  document.getElementById("dry-run-text-view").hidden = showJournal;
+  document.getElementById("dry-run-journal-tab").classList.toggle("active", showJournal);
+  document.getElementById("dry-run-text-tab").classList.toggle("active", !showJournal);
+  document.getElementById("dry-run-journal-tab").setAttribute("aria-selected", String(showJournal));
+  document.getElementById("dry-run-text-tab").setAttribute("aria-selected", String(!showJournal));
+}
+
+document.getElementById("dry-run-journal-tab")?.addEventListener("click", () => setDryRunView("journal"));
+document.getElementById("dry-run-text-tab")?.addEventListener("click", () => setDryRunView("text"));
  
 // UI handlers
 // -------------------------
@@ -249,6 +321,10 @@ document.getElementById('dry-run')?.addEventListener('click', async () => {
   const result = await runImport({ dryRun: true });
   if (!result) return;
   document.getElementById('dry-run-details').textContent = result.output || result.message || '';
+  renderDryRunJournal(result.transactions || []);
+  document.getElementById('dry-run-preview-status').textContent = result.preview_error
+    || (result.transactions?.length ? `${result.transactions.length} transactions in this preview.` : 'No new transactions to preview.');
+  setDryRunView(result.transactions?.length ? 'journal' : 'text');
 
   if (result.success) {
     pendingImport = {

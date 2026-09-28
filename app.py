@@ -542,6 +542,24 @@ async def import_data(
     if p.returncode != 0:
         return {"success": False, "message": p.stderr}
 
+    preview_transactions = []
+    preview_error = None
+    if dry_run and p.stdout.strip():
+        preview = subprocess.run(
+            ["hledger", "print", "-f", "-", "-O", "json"],
+            input=p.stdout,
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+        if preview.returncode == 0:
+            try:
+                preview_transactions = json.loads(preview.stdout)
+            except json.JSONDecodeError:
+                preview_error = "The journal preview could not be parsed; use plain text output."
+        else:
+            preview_error = "The journal preview could not be parsed; use plain text output."
+
     import_comment = None
     if not dry_run:
         result = (p.stderr.strip() or p.stdout.strip() or "transactions imported")
@@ -570,6 +588,8 @@ async def import_data(
         "output": p.stdout,
         "message": p.stderr,
         "comment": import_comment,
+        "transactions": preview_transactions,
+        "preview_error": preview_error,
     }
 
     
