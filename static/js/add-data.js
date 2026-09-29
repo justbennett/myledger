@@ -115,9 +115,14 @@ async function loadJournalList() {
     dropdown.innerHTML = '';
     data.journals.forEach(journal => {
       const option = document.createElement('option');
+
       option.value = journal;
       option.textContent = journal;
-      option.selected = journal === 'main.journal';
+      
+      //if a journal name matches the year like '2026.journal' then select it
+      if (journal.match(/^\d{4}\.journal$/)) {
+        option.selected = true;
+      }
       dropdown.appendChild(option);
     });
 

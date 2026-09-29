@@ -105,6 +105,10 @@ li {
   list-style: none;
 }
 
+.header-link{
+  text-decoration: none;
+  text-align: right;
+}
 /* Make the journal tags go next to the section header*/
 .journal-tags {
   display: flex;
