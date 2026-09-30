@@ -723,3 +723,18 @@ button {
   background: #1e293b;
   color: #cbd5e1;
 }
+
+.login-container {
+  max-width: 400px;
+  margin: 2rem auto;
+  padding: 2rem;
+  background: white;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .05);
+
+}
+
+.login-container button{
+  background: gray;
+  float: right;
+}

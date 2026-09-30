@@ -1,14 +1,26 @@
 <!DOCTYPE html>
+<!--Jinja Macro-->
+{% macro help_icon(link, title="Help") -%} 
+  <span title="{{ title }}"><a href="{{ link }}" target="_blank">⍰</a></span>
+{%- endmacro %}
+
 <html>
 <head>
+  <title>Hledger UI</title>
+  <link rel="stylesheet" href="/static/css/main.css?v=2">
+  <link rel="icon" type="image/png" href="/static/favicon.ico">
+
     <title>MyLedger Login</title>
 </head>
 <body>
-    <h1>MyLedger</h1>
+    <header>
+        <h1>MyLedger</h1>
+    </header>
+    
     {% if error %}
     <p>{{ error }}</p>
     {% endif %}
-
+<div class="login-container">
 <form method="post" action="/login">
     <form method="post" action="/login">
         <label>
@@ -27,5 +39,6 @@
 
         <button type="submit">Log In</button>
     </form>
+    <a href="https://github.com/justbennett/myledger" target="_blank">What is this?</a>
 </body>
 </html>
