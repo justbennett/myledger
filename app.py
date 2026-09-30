@@ -22,6 +22,9 @@ import hashlib
 import os
 import re
 import tempfile
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
 
 app = FastAPI()
 
