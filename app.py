@@ -4,10 +4,12 @@
 # Go to http://127.0.0.1:8000/
 
 import cmd
+import hmac
 from importlib.metadata import files
 from fastapi import FastAPI, HTTPException, Request,UploadFile, File, Form
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
 
-from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from collections import OrderedDict
@@ -26,16 +28,35 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+@app.middleware("http")
+async def require_login(request: Request, call_next):
+    public_paths = {"/login"}
+
+    if request.url.path in public_paths or request.url.path.startswith("/static/"):
+        return await call_next(request)
+
+    if not request.session.get("authenticated"):
+        return RedirectResponse("/login", status_code=303)
+
+    return await call_next(request)
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ["MYLEDGER_SESSION_SECRET"],
+    https_only=False,
+    max_age=43200,
+)
+
 JOURNAL = "journals/main.journal"
 JOURNAL_DIR = Path("journals")
 DATA_DIR = Path("data")
 RULES_DIR = Path("rules")
 
-#************** Helper functions *************************** 
+#************** Helper functions ***************************
 def hledger(args, files=None):
     if files is None:
         files = [JOURNAL]
-    
+
     cmd = ["hledger"]
     for f in files:
         cmd.extend(["-f", f])
@@ -290,15 +311,67 @@ def register(
 @app.get("/", response_class=HTMLResponse)
 def dashboard(request: Request):
     return templates.TemplateResponse(
-        "dashboard.html",
-        {"request": request}
+        request,
+        "dashboard.html"
     )
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "login.html"
+    )
+
+@app.post("/login")
+def login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...)
+):
+    if username != os.environ["MYLEDGER_USERNAME"]:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"error": "Invalid username or password"}
+        )
+
+    stored = os.environ["MYLEDGER_PASSWORD_HASH"]
+
+    try:
+        salt_hex, hash_hex = stored.split(":", 1)
+        salt = bytes.fromhex(salt_hex)
+        expected_hash = bytes.fromhex(hash_hex)
+    except ValueError:
+        raise RuntimeError("Invalid MYLEDGER_PASSWORD_HASH format")
+
+    actual_hash = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode(),
+        salt,
+        200000
+    )
+
+    if not hmac.compare_digest(actual_hash, expected_hash):
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {"error": "Invalid username or password"}
+        )
+
+    request.session["authenticated"] = True
+
+    return RedirectResponse("/", status_code=303)
+
+@app.get("/logout")
+def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/login", status_code=303)
 
 @app.get("/add-data", response_class=HTMLResponse)
 def add_data(request: Request):
     return templates.TemplateResponse(
-        "add-data.html",
-        {"request": request}
+        request,
+        "add-data.html"
     )
 
 @app.get("/journal")

@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MyLedger Login</title>
+</head>
+<body>
+    <h1>MyLedger</h1>
+    {% if error %}
+    <p>{{ error }}</p>
+    {% endif %}
+
+<form method="post" action="/login">
+    <form method="post" action="/login">
+        <label>
+            Username:
+            <input type="text" name="username" required>
+        </label>
+
+        <br><br>
+
+        <label>
+            Password:
+            <input type="password" name="password" required>
+        </label>
+
+        <br><br>
+
+        <button type="submit">Log In</button>
+    </form>
+</body>
+</html>
