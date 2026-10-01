@@ -12,7 +12,7 @@ It provides a browser-based interface for viewing and managing personal financia
 - A virtual environment (`.venv`)
 - A browser
 
-The production deployment currently runs on a Linux VM under Proxmox.
+The production deployment currently runs on a Linux VM.
 
 ## Project Structure
 

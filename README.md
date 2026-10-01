@@ -83,22 +83,6 @@ This means the journal remains a normal hledger journal and can continue to be u
 
 ---
 
-## Installing hledger
-
-MyLedger expects the `hledger` executable to be available on the system `PATH`.
-
-Verify that it is available:
-
-```powershell
-hledger --version
-```
-
-If that command does not work, install hledger and make sure its installation directory is included in `PATH`.
-
-MyLedger invokes hledger directly, so the web application cannot function without it.
-
----
-
 ## Journal Files
 
 The default journal is:
