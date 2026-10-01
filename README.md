@@ -6,6 +6,8 @@ It provides a browser-based view of hledger journals with account balances, jour
 
 The application is built with **Python, FastAPI, Jinja2, and vanilla JavaScript**, with hledger handling the underlying accounting calculations and journal processing.
 
+For local development, authentication setup, and production deployment procedures, see [development.md](development.md).
+
 ## Features
 
 ### Dashboard
@@ -81,49 +83,6 @@ This means the journal remains a normal hledger journal and can continue to be u
 
 ---
 
-## Requirements
-
-You will need:
-
-* Python 3.10 or newer
-* [hledger](https://hledger.org/)
-* A modern web browser
-* Windows, Linux, or another platform capable of running the required Python and hledger tools
-
-The application uses Python features such as:
-
-```python
-str | None
-```
-
-so a reasonably recent Python version is required.
-
-### Python packages
-
-The application imports:
-
-* FastAPI
-* Uvicorn
-* Jinja2
-* itsdangerous
-* python-dotenv
-* python-multipart
-
-Install the dependencies listed in `requirements.txt`:
-
-For example:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-python -m pip install -r requirements.txt
-```
-
-On systems where PowerShell script execution is restricted, activate the environment using the appropriate method for your shell.
-
----
-
 ## Installing hledger
 
 MyLedger expects the `hledger` executable to be available on the system `PATH`.
@@ -137,173 +96,6 @@ hledger --version
 If that command does not work, install hledger and make sure its installation directory is included in `PATH`.
 
 MyLedger invokes hledger directly, so the web application cannot function without it.
-
----
-
-## Project Structure
-
-```text
-myledger/
-├── app.py
-├── index.html
-├── LICENSE
-├── .gitignore
-│
-├── templates/
-│   ├── dashboard.html
-│   ├── add-data.html
-│   └── footer.html
-│
-├── static/
-│   ├── css/
-│   │   └── main.css
-│   ├── js/
-│   │   ├── app.js
-│   │   ├── add-data.js
-│   │   └── vendor/
-│   │       ├── chart.umd.min.js
-│   │       └── CHARTJS-LICENSE.md
-│   └── favicon.ico
-│
-├── examples/
-│   ├── README.md
-│   ├── data/
-│   │   └── sample.csv
-│   ├── journals/
-│   │   ├── main.journal
-│   │   └── sample.journal
-│   └── rules/
-│       └── sample.csv.rules
-│
-├── journals/
-├── data/
-└── rules/
-```
-
-The `journals/`, `data/`, and `rules/` directories are intentionally ignored by Git because they normally contain private financial information.
-
----
-
-## Initial Setup
-
-Clone the repository:
-
-```powershell
-git clone https://github.com/justbennett/myledger.git
-cd myledger
-```
-
-Create a Python virtual environment:
-
-```powershell
-python -m venv .venv
-```
-
-Activate it:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Install the Python dependencies:
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-On Linux, create and activate the environment and install the same dependencies with:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-```
-
-Configure the login credentials before starting the application. Copy `.env.example` to `.env`:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-```bash
-cp .env.example .env
-```
-
-Then set `MYLEDGER_USERNAME`, `MYLEDGER_PASSWORD_HASH`, and `MYLEDGER_SESSION_SECRET`. The `.env` file is excluded from Git; keep it private.
-
-Generate a password hash and a session secret with Python:
-
-```powershell
-python -c "import getpass, hashlib, secrets; salt=secrets.token_bytes(16); print(salt.hex()+':'+hashlib.pbkdf2_hmac('sha256', getpass.getpass('Password: ').encode(), salt, 200000).hex())"
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
-
-Put the first command's output in `MYLEDGER_PASSWORD_HASH` and the second command's output in `MYLEDGER_SESSION_SECRET` in `.env`. Set your chosen login name in `MYLEDGER_USERNAME`.
-
-Create the directories used by the application:
-
-```powershell
-New-Item -ItemType Directory -Force journals, data, rules
-```
-
-You can then copy the included example files into those directories for testing.
-
-```powershell
-Copy-Item examples/journals/* journals/ -NoClobber
-Copy-Item examples/data/* data/ -NoClobber
-Copy-Item examples/rules/* rules/ -NoClobber
-```
-
-The example files use fictional data and are safe for testing.
-
-**Do not copy the examples over an existing personal ledger.**
-
----
-
-## Running MyLedger
-
-MyLedger should be run from the project root.
-
-Activate the virtual environment:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-For Linux, activate it with:
-
-```bash
-source .venv/bin/activate
-```
-
-Start the FastAPI application for local development:
-
-```powershell
-python -m uvicorn app:app --reload
-```
-
-The same command works on Linux after activating the virtual environment. Install hledger separately and ensure it is available on `PATH` for the account that runs MyLedger.
-
-Then open:
-
-```text
-http://127.0.0.1:8000/
-```
-
-The application expects to find the journal and supporting directories relative to the project directory.
-
-For example:
-
-```text
-myledger/
-├── app.py
-├── journals/
-│   └── main.journal
-├── data/
-└── rules/
-```
-
-Running the application from another working directory may prevent hledger and the application from finding these files correctly.
 
 ---
 
@@ -592,6 +384,8 @@ These fixtures use invented accounts, descriptions, and amounts.
 
 See [`examples/README.md`](examples/README.md) for the recommended way to copy them into a clean checkout.
 
+The example files are fictional. Do not copy them over an existing personal ledger.
+
 ---
 
 ## Security Considerations
@@ -602,39 +396,6 @@ The application directly reads and writes journal files and executes the `hledge
 
 For private remote use, restrict access with a VPN or firewall and bind Uvicorn to localhost behind a properly configured HTTPS reverse proxy. Run without `--reload`, keep `.env` and the journal, data, and rules directories readable only by the service account, and back up ledger files securely. Before public deployment, enable HTTPS-only session cookies in the application and review the authentication and deployment security controls.
 
-The default Uvicorn host is localhost. For example, a Linux development run is:
-
-```bash
-python -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
-```
-
-The application must be run from the project root so it can find its journals, templates, and static files.
-
----
-
-## Development
-
-During development, use:
-
-```powershell
-python -m uvicorn app:app --reload
-```
-
-The `--reload` option causes Uvicorn to restart the application when Python source files change.
-
-The application is deliberately lightweight, so most changes can be made directly to:
-
-```text
-app.py
-templates/
-static/js/
-static/css/
-```
-
-No frontend build step is currently required.
-
----
-
 ## Limitations
 
 The current project does not include:
@@ -644,7 +405,6 @@ The current project does not include:
 * Hardened authentication and multi-user access control
 * Database-backed storage
 * Automated tests in the repository
-* A production deployment configuration
 
 MyLedger is therefore best treated as a personal/local accounting interface rather than a multi-user accounting service.
 
