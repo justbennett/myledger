@@ -1,6 +1,6 @@
 #****This must be run in the root of the project (where the journals/ directory is) for the hledger command to find the journal file(s)********
-# To run: .\venv\Scripts\Activate
-# Then: uvicorn app:app --reload
+# To run: .\.venv\Scripts\Activate.ps1
+# Then: python -m uvicorn app:app --reload
 # Go to http://127.0.0.1:8000/
 
 import cmd

@@ -105,9 +105,11 @@ The application imports:
 * FastAPI
 * Uvicorn
 * Jinja2
+* itsdangerous
+* python-dotenv
 * python-multipart
 
-There is currently no `requirements.txt` or `pyproject.toml` in the repository, so dependencies must be installed manually.
+Install the dependencies listed in `requirements.txt`:
 
 For example:
 
@@ -115,7 +117,7 @@ For example:
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
-pip install fastapi uvicorn jinja2 python-multipart
+python -m pip install -r requirements.txt
 ```
 
 On systems where PowerShell script execution is restricted, activate the environment using the appropriate method for your shell.
@@ -206,8 +208,37 @@ Activate it:
 Install the Python dependencies:
 
 ```powershell
-pip install fastapi uvicorn jinja2 python-multipart
+python -m pip install -r requirements.txt
 ```
+
+On Linux, create and activate the environment and install the same dependencies with:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+```
+
+Configure the login credentials before starting the application. Copy `.env.example` to `.env`:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+```bash
+cp .env.example .env
+```
+
+Then set `MYLEDGER_USERNAME`, `MYLEDGER_PASSWORD_HASH`, and `MYLEDGER_SESSION_SECRET`. The `.env` file is excluded from Git; keep it private.
+
+Generate a password hash and a session secret with Python:
+
+```powershell
+python -c "import getpass, hashlib, secrets; salt=secrets.token_bytes(16); print(salt.hex()+':'+hashlib.pbkdf2_hmac('sha256', getpass.getpass('Password: ').encode(), salt, 200000).hex())"
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+Put the first command's output in `MYLEDGER_PASSWORD_HASH` and the second command's output in `MYLEDGER_SESSION_SECRET` in `.env`. Set your chosen login name in `MYLEDGER_USERNAME`.
 
 Create the directories used by the application:
 
@@ -239,11 +270,19 @@ Activate the virtual environment:
 .\.venv\Scripts\Activate.ps1
 ```
 
-Start the FastAPI application:
+For Linux, activate it with:
+
+```bash
+source .venv/bin/activate
+```
+
+Start the FastAPI application for local development:
 
 ```powershell
-uvicorn app:app --reload
+python -m uvicorn app:app --reload
 ```
+
+The same command works on Linux after activating the virtual environment. Install hledger separately and ensure it is available on `PATH` for the account that runs MyLedger.
 
 Then open:
 
@@ -557,21 +596,19 @@ See [`examples/README.md`](examples/README.md) for the recommended way to copy t
 
 ## Security Considerations
 
-MyLedger is currently intended primarily for local use.
+MyLedger has a single-user login configured through `.env`; it is not a hardened, multi-user service. The login does not replace network-level access controls.
 
-The application directly reads and writes journal files and executes the `hledger` executable. There is currently no user authentication or authorization layer in the application.
+The application directly reads and writes journal files and executes the `hledger` executable. The session cookie is currently configured with `https_only=False`, so do not expose this version directly to the public Internet, even behind a TLS-terminating reverse proxy.
 
-For that reason, avoid exposing the application directly to the public Internet.
+For private remote use, restrict access with a VPN or firewall and bind Uvicorn to localhost behind a properly configured HTTPS reverse proxy. Run without `--reload`, keep `.env` and the journal, data, and rules directories readable only by the service account, and back up ledger files securely. Before public deployment, enable HTTPS-only session cookies in the application and review the authentication and deployment security controls.
 
-The default Uvicorn command:
+The default Uvicorn host is localhost. For example, a Linux development run is:
 
-```powershell
-uvicorn app:app --reload
+```bash
+python -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-binds to the local machine by default.
-
-If the application is ever deployed on a network-accessible host, authentication, access control, HTTPS, and additional security hardening should be considered before exposing it to other users.
+The application must be run from the project root so it can find its journals, templates, and static files.
 
 ---
 
@@ -580,7 +617,7 @@ If the application is ever deployed on a network-accessible host, authentication
 During development, use:
 
 ```powershell
-uvicorn app:app --reload
+python -m uvicorn app:app --reload
 ```
 
 The `--reload` option causes Uvicorn to restart the application when Python source files change.
@@ -602,10 +639,9 @@ No frontend build step is currently required.
 
 The current project does not include:
 
-* A Python dependency lockfile or `requirements.txt`
+* A Python dependency lockfile
 * A frontend package/build system
-* Authentication
-* Multi-user access control
+* Hardened authentication and multi-user access control
 * Database-backed storage
 * Automated tests in the repository
 * A production deployment configuration
