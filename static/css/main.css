@@ -531,18 +531,51 @@ section h2 {
   background: #e2f3ef;
 }
 
-#journal-editor {
+#journal-editor,
+#rules-editor,
+#rules-create-dialog {
   width: min(760px, calc(100vw - 2rem));
   max-width: none;
   border: 1px solid #cbd5e1;
   padding: 1.25rem;
 }
 
-#journal-editor::backdrop {
+#rules-editor {
+  width: min(960px, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  box-sizing: border-box;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e293b;
+}
+
+#rules-create-dialog {
+  width: min(30rem, calc(100vw - 2rem));
+  box-sizing: border-box;
+  border: 1px solid #94a3b8;
+  border-radius: 6px;
+  background: #fff;
+  color: #1e293b;
+}
+
+.rules-file-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+
+
+#journal-editor::backdrop,
+#rules-editor::backdrop,
+#rules-create-dialog::backdrop {
   background: rgb(15 23 42 / 45%);
 }
 
-#journal-editor form {
+#journal-editor form,
+#rules-editor form,
+#rules-create-dialog form {
   display: grid;
   gap: 0.75rem;
 }
@@ -581,7 +614,8 @@ section h2 {
   background: white;
 }
 
-#journal-entry-content {
+#journal-entry-content,
+#rules-editor-content {
   width: 100%;
   min-height: 18rem;
   resize: vertical;
@@ -592,19 +626,50 @@ section h2 {
   white-space: pre;
 }
 
-#journal-editor-status {
+#rules-create-name {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem;
+  border: 1px solid #94a3b8;
+  border-radius: 4px;
+}
+
+#rules-editor-content {
+  height: min(60vh, 38rem);
+  min-height: 24rem;
+  box-sizing: border-box;
+}
+
+#journal-editor-status,
+#rules-create-status {
   min-height: 1.25rem;
   margin: 0;
   color: #9f1239;
 }
 
+#rules-create-status {
+  color: #475569;
+}
+
 @media (max-width: 600px) {
-  #journal-editor {
+  #journal-editor,
+  #rules-editor,
+  #rules-create-dialog {
     padding: 1rem;
   }
 
-  #journal-entry-content {
+  #journal-entry-content,
+  #rules-editor-content {
     min-height: 14rem;
+  }
+
+  #rules-editor {
+    width: calc(100vw - 2rem);
+    max-height: calc(100vh - 2rem);
+  }
+
+  #rules-editor-content {
+    height: 55vh;
   }
 
   .chart-controls {

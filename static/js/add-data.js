@@ -18,6 +18,54 @@ document.getElementById('rules-toggle').addEventListener('click', () => {
   dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
 });
 
+document.getElementById('rules-create-button')?.addEventListener('click', () => {
+  const dialog = document.getElementById('rules-create-dialog');
+  const nameInput = document.getElementById('rules-create-name');
+  document.getElementById('rules-create-status').textContent = 'The .rules extension is added automatically.';
+  document.getElementById('rules-create-submit').disabled = false;
+  nameInput.value = '';
+  dialog.showModal();
+  nameInput.focus();
+});
+
+document.getElementById('rules-create-close')?.addEventListener('click', () => {
+  document.getElementById('rules-create-dialog').close();
+});
+
+document.getElementById('rules-create-cancel')?.addEventListener('click', () => {
+  document.getElementById('rules-create-dialog').close();
+});
+
+document.getElementById('rules-create-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submitButton = document.getElementById('rules-create-submit');
+  const status = document.getElementById('rules-create-status');
+  submitButton.disabled = true;
+  status.textContent = 'Creating file...';
+
+  try {
+    const response = await fetch('/rules', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: document.getElementById('rules-create-name').value }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || 'Unable to create rules file');
+
+    const select = document.getElementById('rules-select');
+    const option = document.createElement('option');
+    option.value = result.filename;
+    option.textContent = result.filename;
+    select.appendChild(option);
+    select.value = result.filename;
+    select.dispatchEvent(new Event('change'));
+    document.getElementById('rules-create-dialog').close();
+  } catch (error) {
+    status.textContent = error.message;
+    submitButton.disabled = false;
+  }
+});
+
 document.getElementById('data-toggle')?.addEventListener('click', () => {
   const dropdown = document.getElementById('data-select');
   dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
@@ -29,12 +77,7 @@ document.getElementById('journal-toggle')?.addEventListener('click', () => {
 });
 
 document.getElementById('journal-select')?.addEventListener('change', function() {
-  const viewer = document.getElementById('journal-viewer');
-  const details = document.getElementById('journal-details');
-  if (!viewer || !details) return;
-
-  details.textContent = this.value;
-  viewer.style.display = 'block';
+  showJournalPreview(this.value);
 });
 
 // -------------------------
@@ -43,6 +86,33 @@ document.getElementById('journal-select')?.addEventListener('change', function()
 function makeObjectUrlFromText(text) {
   const blob = new Blob([text], { type: 'text/plain' });
   return URL.createObjectURL(blob);
+}
+
+async function showJournalPreview(filename) {
+  const viewer = document.getElementById('journal-viewer');
+  const details = document.getElementById('journal-details');
+  const preview = document.getElementById('journal-content');
+  if (!viewer || !details || !preview) return;
+  if (!filename) {
+    viewer.style.display = 'none';
+    return;
+  }
+
+  details.textContent = filename;
+  try {
+    const response = await fetch(`/journal-files/${encodeURIComponent(filename)}`);
+    if (!response.ok) throw new Error('Could not load journal file');
+    const text = await response.text();
+
+    if (preview.dataset.blobUrl) URL.revokeObjectURL(preview.dataset.blobUrl);
+    const url = makeObjectUrlFromText(text);
+    preview.data = url;
+    preview.dataset.blobUrl = url;
+    viewer.style.display = 'block';
+  } catch (error) {
+    details.textContent = `${filename} (preview unavailable)`;
+    console.error('Error loading journal file:', error);
+  }
 }
 
 let pendingImport = null;
@@ -69,20 +139,80 @@ document.getElementById('data-select').addEventListener('change', async function
 });
 
 // show rule details when the selection changes
+let activeRuleName = '';
+let activeRuleContent = '';
+
 document.getElementById('rules-select').addEventListener('change', async function() {
     const sel = this.value;
+    const editButton = document.getElementById('rules-edit-button');
+    editButton.hidden = true;
     try {
       const response = await fetch(`/rules/${encodeURIComponent(sel)}?t=${Date.now()}`);
+      if (!response.ok) throw new Error('Unable to load rules file');
       const text = await response.text();
+      if (this.value !== sel) return;
       const url = makeObjectUrlFromText(text);
       document.getElementById('rules-viewer').style.display = 'block';
       document.getElementById('rule-details').textContent = sel;
       const rc = document.getElementById('rule-content');
+      if (rc?.dataset.blobUrl) URL.revokeObjectURL(rc.dataset.blobUrl);
       if (rc) rc.data = url;
+      if (rc) rc.dataset.blobUrl = url;
+      activeRuleName = sel;
+      activeRuleContent = text;
+      editButton.hidden = false;
       console.log('Selected rule:', sel);
     } catch (error) {
       console.error('Error loading rule file:', error);
     }
+});
+
+document.getElementById('rules-edit-button')?.addEventListener('click', () => {
+  if (!activeRuleName) return;
+  document.getElementById('rules-editor-title').textContent = `Edit ${activeRuleName}`;
+  document.getElementById('rules-editor-content').value = activeRuleContent;
+  document.getElementById('rules-editor-status').textContent = '';
+  document.getElementById('rules-editor-save').disabled = false;
+  document.getElementById('rules-editor').showModal();
+  document.getElementById('rules-editor-content').focus();
+});
+
+document.getElementById('rules-editor-close')?.addEventListener('click', () => {
+  document.getElementById('rules-editor').close();
+});
+
+document.getElementById('rules-editor-cancel')?.addEventListener('click', () => {
+  document.getElementById('rules-editor').close();
+});
+
+document.getElementById('rules-editor-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const saveButton = document.getElementById('rules-editor-save');
+  const status = document.getElementById('rules-editor-status');
+  const content = document.getElementById('rules-editor-content').value;
+  saveButton.disabled = true;
+  status.textContent = 'Saving...';
+
+  try {
+    const response = await fetch(`/rules/${encodeURIComponent(activeRuleName)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, original_content: activeRuleContent }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || 'Unable to save rules file');
+
+    activeRuleContent = content;
+    const preview = document.getElementById('rule-content');
+    if (preview.dataset.blobUrl) URL.revokeObjectURL(preview.dataset.blobUrl);
+    const url = makeObjectUrlFromText(content);
+    preview.data = url;
+    preview.dataset.blobUrl = url;
+    document.getElementById('rules-editor').close();
+  } catch (error) {
+    status.textContent = error.message;
+    saveButton.disabled = false;
+  }
 });
 
 async function loadFileList(list, elementId){
@@ -127,12 +257,7 @@ async function loadJournalList() {
     });
 
     const selectedJournal = dropdown.value;
-    const viewer = document.getElementById('journal-viewer');
-    const details = document.getElementById('journal-details');
-    if (selectedJournal && viewer && details) {
-      details.textContent = selectedJournal;
-      viewer.style.display = 'block';
-    }
+    if (selectedJournal) showJournalPreview(selectedJournal);
   } catch (error) {
     console.error('Error loading journals:', error);
   }
@@ -258,7 +383,8 @@ document.getElementById('upload-data-input')?.addEventListener('change', async (
   const uploadButton = document.getElementById('upload-csv');
   const status = document.getElementById('upload-status');
   uploadButton.disabled = !file;
-  status.textContent = file ? `${file.name} selected. Upload it to use it for import.` : '';
+  uploadButton.hidden = !file;
+  status.textContent = file ? `File selected. Upload it to use it for import.` : '';
   if (!file) return;
   const text = await file.text();
   const preview = document.getElementById('file-preview');
@@ -312,6 +438,7 @@ document.getElementById('upload-csv')?.addEventListener('click', async () => {
     importButton.style.display = 'none';
     status.textContent = `${result.file} uploaded. Select an import rule and destination journal, then execute a dry run.`;
     input.value = '';
+    uploadButton.hidden = true;
   } catch (error) {
     status.textContent = error.message;
     uploadButton.disabled = false;
