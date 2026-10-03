@@ -122,8 +122,11 @@ async function loadBalance() {
   }
 }
 
-async function loadRegister(account = null) {
-  const url = account ? `/register?journals=${selectedJournals.join(',')}&account=${encodeURIComponent(account)}` : `/register?journals=${selectedJournals.join(',')}`;
+async function loadRegister(account = null, query = currentJournalSearch) {
+  const params = new URLSearchParams({ journals: selectedJournals.join(',') });
+  if (account) params.set("account", account);
+  if (query) params.set("query", query);
+  const url = `/register?${params.toString()}`;
   const res = await fetch(url);
   const transactions = await res.json();
 
@@ -448,7 +451,6 @@ function setJournalView(view) {
     const panelId = candidate === "journal" ? "journal-table-panel" : `${candidate}-panel`;
     document.getElementById(panelId).hidden = !selected;
   }
-  document.getElementById("journal-query-controls").hidden = view === "register";
   if (view === "charts") updateJournalChart();
   if (view === "register") loadRegister(currentAccountFilter);
 }
@@ -728,6 +730,7 @@ document
     searchTimer = setTimeout(() => {
       currentJournalSearch = e.target.value.trim();
       reloadJournal();
+      loadRegister(currentAccountFilter, currentJournalSearch);
     }, 300);
   });
 

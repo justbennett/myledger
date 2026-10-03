@@ -21,6 +21,7 @@ from pathlib import Path
 import hashlib
 import os
 import re
+import shlex
 import tempfile
 from dotenv import load_dotenv
 
@@ -69,6 +70,12 @@ def hledger(args, files=None):
     if p.returncode != 0:
         raise RuntimeError(p.stderr)
     return p.stdout
+
+def append_query_terms(args, query):
+    try:
+        args.extend(shlex.split(query))
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=f"Invalid query quoting: {error}")
 
 def build_register_transactions(rows, account_filter=None):
     grouped = group_register_rows(rows)
@@ -299,6 +306,7 @@ def register(
     account: str | None = None,
     begin: str | None = None,
     end: str | None = None,
+    query: str | None = None,
 ):
     files = [f"journals/{j}" for j in journals.split(',')] if journals else [JOURNAL]
     args = ["register", "-O", "json"]
@@ -309,6 +317,8 @@ def register(
         args += ["--begin", begin]
     if end:
         args += ["--end", end]
+    if query:
+        append_query_terms(args, query)
 
     raw = hledger(args, files)  # get raw JSON output
     rows = json.loads(raw) # parse JSON
@@ -400,7 +410,7 @@ def journal(
     if match:
         args += ["-m ", match]
     if query:
-        args.append(query)
+        append_query_terms(args, query)
 
     out = hledger(args, files)
     txs = json.loads(out)

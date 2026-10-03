@@ -15,7 +15,7 @@ body {
 header {
   background: #1e293b;
   color: white;
-  padding: 1rem 2rem;
+  padding: 1rem 2rem ;
 }
 
 main {
@@ -105,9 +105,18 @@ li {
   list-style: none;
 }
 
-.header-link{
+.header-link li a{
   text-decoration: none;
   text-align: right;
+  padding: 0.5rem;
+  color: white;
+}
+
+.header-link ul{
+  display: flex;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0;
 }
 /* Make the journal tags go next to the section header*/
 .journal-tags {
@@ -765,14 +774,18 @@ button {
   cursor: pointer;
 }
 
+
 .list-select {
-  display: none;
-  position: absolute;
-  background: white;
-  border: 1px solid #ccc;
-  z-index: 10;
-  border-radius: 5px;
-  padding: 0.2rem;
+	display: none;
+	position: absolute;
+	background: white;
+	border: 1px solid #ccc;
+	z-index: 10;
+	border-radius: 5px;
+	padding: 0.2rem;
+	width: calc(90% - 1rem);
+	top: 4rem;
+	left: 3rem;
 }
 
 .file-preview {
