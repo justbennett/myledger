@@ -10,3 +10,6 @@ __pycache__/
 /rules/
 /register.json
 /*.csv
+/myledger-data/
+*.workspace
+process.md
