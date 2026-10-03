@@ -50,11 +50,11 @@ app.add_middleware(
     https_only=False,
     max_age=43200,
 )
-
-JOURNAL = "journals/main.journal"
-JOURNAL_DIR = Path("journals")
 DATA_DIR = Path("data")
-RULES_DIR = Path("rules")
+LEDGER_DATA_DIR = Path(os.environ.get("MYLEDGER_DATA_DIR", "."))
+JOURNAL_DIR = LEDGER_DATA_DIR / "journals"
+RULES_DIR = LEDGER_DATA_DIR / "rules"
+JOURNAL = str(JOURNAL_DIR / "main.journal")
 
 #************** Helper functions ***************************
 def hledger(args, files=None):
@@ -270,7 +270,7 @@ def balance(
     end: str | None = None,
     depth: int | None = None,
 ):
-    files = [f"journals/{j}" for j in journals.split(',')] if journals else [JOURNAL]
+    files = [str(JOURNAL_DIR / j) for j in journals.split(',')] if journals else [JOURNAL]
     args = ["balance", "--tree", "--empty", "-O", "json"]
 
     if begin:
@@ -288,7 +288,7 @@ def balance(
 @app.get("/journals")
 def list_journals():
     import os
-    journals_dir = "journals"
+    journals_dir = JOURNAL_DIR
     if os.path.exists(journals_dir):
         files = [f for f in os.listdir(journals_dir) if not f.startswith('.')]
         return {"journals": files}
@@ -308,7 +308,7 @@ def register(
     end: str | None = None,
     query: str | None = None,
 ):
-    files = [f"journals/{j}" for j in journals.split(',')] if journals else [JOURNAL]
+    files = [str(JOURNAL_DIR / j) for j in journals.split(',')] if journals else [JOURNAL]
     args = ["register", "-O", "json"]
 
     if account:
@@ -402,7 +402,7 @@ def journal(
    # end: str | None = None,
     query: str | None = None,
 ):
-    files = [f"journals/{j}" for j in journals.split(',')] if journals else [JOURNAL]
+    files = [str(JOURNAL_DIR / j) for j in journals.split(',')] if journals else [JOURNAL]
     args = ["print", "--output-format=json"]
 
     if account:
@@ -692,7 +692,7 @@ async def import_data(
         rule_path = resolve_data_file(RULES_DIR, rule)
     except HTTPException as error:
         return {"success": False, "message": error.detail}
-    journal_path = f"journals/{journal}"
+    journal_path = str(JOURNAL_DIR / journal)
 
     with open(journal_path, "r", encoding="utf-8") as journal_file:
         journal_before_import = journal_file.read()
