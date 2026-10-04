@@ -1,21 +1,40 @@
 // -------------------------
 // Dropdown auto-hide (global)
 // -------------------------
+function closeAllSelects(exceptId = null) {
+  const selectorIds = ['data-select', 'rules-select', 'journal-select'];
+  for (const id of selectorIds) {
+    if (id === exceptId) continue;
+    const dropdown = document.getElementById(id);
+    if (dropdown) dropdown.style.display = 'none';
+  }
+}
+
+function toggleSelect(id) {
+  const dropdown = document.getElementById(id);
+  if (!dropdown) return;
+
+  const isOpen = dropdown.style.display === 'block';
+  closeAllSelects(isOpen ? null : id);
+  dropdown.style.display = isOpen ? 'none' : 'block';
+}
+
 document.addEventListener('click', (e) => {
-  for (const dropdown of document.getElementsByTagName('select')) {
-    const toggle = dropdown.previousElementSibling;
-    if (!toggle.contains(e.target) && !dropdown.contains(e.target)) {
-      dropdown.style.display = 'none';
-    }
+  const target = e.target;
+  const clickedToggle = target.closest('.select-toggle');
+  const clickedSelect = target.closest('.list-select');
+
+  if (!clickedToggle && !clickedSelect) {
+    closeAllSelects();
   }
 });
 
 // -------------------------
 // Toggle buttons
 // -------------------------
-document.getElementById('rules-toggle').addEventListener('click', () => {
-  const dropdown = document.getElementById('rules-select');
-  dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+document.getElementById('rules-toggle').addEventListener('click', (event) => {
+  event.stopPropagation();
+  toggleSelect('rules-select');
 });
 
 document.getElementById('rules-create-button')?.addEventListener('click', () => {
@@ -66,20 +85,154 @@ document.getElementById('rules-create-form')?.addEventListener('submit', async (
   }
 });
 
-document.getElementById('data-toggle')?.addEventListener('click', () => {
-  const dropdown = document.getElementById('data-select');
-  dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+document.getElementById('data-toggle')?.addEventListener('click', (event) => {
+  event.stopPropagation();
+  toggleSelect('data-select');
 });
 
-document.getElementById('journal-toggle')?.addEventListener('click', () => {
-  const dropdown = document.getElementById('journal-select');
-  dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+document.getElementById('journal-toggle')?.addEventListener('click', (event) => {
+  event.stopPropagation();
+  toggleSelect('journal-select');
 });
 
-document.getElementById('journal-select')?.addEventListener('change', function() {
-  showJournalPreview(this.value);
+document.getElementById('journal-create-button')?.addEventListener('click', () => {
+  const dialog = document.getElementById('journal-create-dialog');
+  const nameInput = document.getElementById('journal-create-name');
+  document.getElementById('journal-create-status').textContent = 'The .journal extension is added automatically.';
+  document.getElementById('journal-create-submit').disabled = false;
+  nameInput.value = '';
+  dialog.showModal();
+  nameInput.focus();
 });
 
+document.getElementById('journal-create-close')?.addEventListener('click', () => {
+  document.getElementById('journal-create-dialog').close();
+});
+
+document.getElementById('journal-create-cancel')?.addEventListener('click', () => {
+  document.getElementById('journal-create-dialog').close();
+});
+
+document.getElementById('journal-create-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submitButton = document.getElementById('journal-create-submit');
+  const status = document.getElementById('journal-create-status');
+  submitButton.disabled = true;
+  status.textContent = 'Creating file...';
+
+  try {
+    const response = await fetch('/journals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename: document.getElementById('journal-create-name').value }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || 'Unable to create journal file');
+
+    const select = document.getElementById('journal-select');
+    const option = document.createElement('option');
+    option.value = result.filename;
+    option.textContent = result.filename;
+    select.appendChild(option);
+    select.value = result.filename;
+    select.dispatchEvent(new Event('change'));
+    document.getElementById('journal-create-dialog').close();
+  } catch (error) {
+    status.textContent = error.message;
+    submitButton.disabled = false;
+  }
+});
+
+let activeJournalName = '';
+let activeJournalContent = '';
+
+document.getElementById('journal-select')?.addEventListener('change', async function() {
+  const sel = this.value;
+  const editButton = document.getElementById('journal-edit-button');
+  
+  try {
+    const response = await fetch(`/journal-files/${encodeURIComponent(sel)}?t=${Date.now()}`);
+    if (!response.ok) throw new Error('Unable to load journal file');
+    const text = await response.text();
+    if (this.value !== sel) return;
+    const url = makeObjectUrlFromText(text);
+    document.getElementById('journal-viewer').style.display = 'block';
+    document.getElementById('journal-details').textContent = sel;
+    const rc = document.getElementById('journal-content');
+    if (rc?.dataset.blobUrl) URL.revokeObjectURL(rc.dataset.blobUrl);
+    if (rc) rc.data = url;
+    if (rc) rc.dataset.blobUrl = url;
+    activeJournalName = sel;
+    activeJournalContent = text;
+    editButton.hidden = false;
+    console.log('Selected journal:', sel);
+  } catch (error) {
+    console.error('Error loading journal file:', error);
+  }
+});
+
+document.getElementById('journal-edit-button')?.addEventListener('click', () => {
+  if (!activeJournalName) return;
+  document.getElementById('journal-editor-title').textContent = `Edit ${activeJournalName}`;
+  document.getElementById('journal-editor-content').value = activeJournalContent;
+  document.getElementById('journal-editor-status').textContent = '';
+  document.getElementById('journal-editor-save').disabled = false;
+  document.getElementById('journal-editor').showModal();
+  document.getElementById('journal-editor-content').focus();
+});
+
+document.getElementById('journal-editor-close')?.addEventListener('click', () => {
+  document.getElementById('journal-editor').close();
+});
+
+document.getElementById('journal-editor-cancel')?.addEventListener('click', () => {
+  document.getElementById('journal-editor').close();
+});
+
+document.getElementById('journal-editor-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const saveButton = document.getElementById('journal-editor-save');
+  const status = document.getElementById('journal-editor-status');
+  const content = document.getElementById('journal-editor-content').value;
+
+  const confirmed = window.confirm(
+    `You are about to overwrite ${activeJournalName}.\n\nThis is risky and should only be done if you have a backup. Continue?`
+  );
+  if (!confirmed) {
+    status.textContent = 'Save cancelled.';
+    saveButton.disabled = false;
+    return;
+  }
+
+  saveButton.disabled = true;
+  status.textContent = 'Saving...';
+
+  try {
+    const response = await fetch(`/journal-files/${encodeURIComponent(activeJournalName)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, original_content: activeJournalContent }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || 'Unable to save journal file');
+
+    activeJournalContent = content;
+    const preview = document.getElementById('journal-content');
+    if (preview.dataset.blobUrl) URL.revokeObjectURL(preview.dataset.blobUrl);
+    const url = makeObjectUrlFromText(content);
+    preview.data = url;
+    preview.dataset.blobUrl = url;
+    document.getElementById('journal-editor').close();
+  } catch (error) {
+    status.textContent = error.message;
+    saveButton.disabled = false;
+  }
+});
+
+//Add a click event listener to the data-upload-button to trigger the file input click
+document.getElementById('data-upload-button')?.addEventListener('click', () => {
+  document.getElementById('upload-data-input').click();
+});
 // -------------------------
 // Utilities
 // -------------------------

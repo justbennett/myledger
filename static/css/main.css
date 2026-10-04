@@ -70,6 +70,10 @@ footer nav li {
   margin: 0 0.5rem;
 }
 
+ul {
+  margin-top: 0;
+}
+
 /* ----------------- Tables ----------------- */
 table {
   width: 100%;
@@ -403,6 +407,22 @@ main.add-data-main {
   max-width: 100%;
 }
 
+#csv-uploader,
+#rules-selector,
+#destination-journal {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+#csv-uploader > h2,
+#rules-selector > h2,
+#destination-journal > h2 {
+  display: block;
+  margin: 0;
+}
+
 #dry-run-section {
   width: 100%;
   margin-top: 1.75rem;
@@ -568,13 +588,17 @@ section h2 {
   color: #1e293b;
 }
 
-.rules-file-controls {
+#csv-uploader > div:first-of-type,
+.rules-file-controls,
+.journal-select-controls {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-
+#destination-journal {
+  position: relative;
+}
 
 #journal-editor::backdrop,
 #rules-editor::backdrop,
@@ -782,10 +806,9 @@ button {
 	border: 1px solid #ccc;
 	z-index: 10;
 	border-radius: 5px;
-	padding: 0.2rem;
-	width: calc(90% - 1rem);
-	top: 4rem;
-	left: 3rem;
+	padding: 0.4rem;
+	min-width: 14rem;
+	
 }
 
 .file-preview {

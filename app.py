@@ -294,11 +294,81 @@ def list_journals():
         return {"journals": files}
     return {"journals": []}
 
+@app.post("/journals")
+async def create_journal_file(request: Request):
+    data = await request.json()
+    requested_name = data.get("filename") if isinstance(data, dict) else None
+    if not isinstance(requested_name, str):
+        raise HTTPException(status_code=400, detail="Enter a valid journal file name")
+
+    stem = requested_name.strip()
+    if stem.lower().endswith(".journal"):
+        stem = stem[:-7]
+    if (
+        not stem
+        or len(stem) > 100
+        or stem.startswith(".")
+        or Path(stem).name != stem
+        or "/" in stem
+        or "\\" in stem
+        or any(character in stem for character in '<>:"|?*')
+        or any(ord(character) < 32 for character in stem)
+        or stem.endswith((" ", "."))
+    ):
+        raise HTTPException(status_code=400, detail="Enter a valid journal file name")
+
+    filename = f"{stem}.journal"
+    JOURNAL_DIR.mkdir(parents=True, exist_ok=True)
+    journal_path = JOURNAL_DIR / filename
+    try:
+        with journal_path.open("x", encoding="utf-8"):
+            pass
+    except FileExistsError:
+        raise HTTPException(status_code=409, detail="A journal file with that name already exists")
+
+    return {"filename": filename}
+
 @app.get("/journal-files/{filename}", response_class=PlainTextResponse)
 def read_journal_file(filename: str):
     if Path(filename).suffix.lower() != ".journal":
         raise HTTPException(status_code=404, detail="File not found")
     return resolve_data_file(JOURNAL_DIR, filename).read_text(encoding="utf-8")
+
+@app.put("/journal-files/{filename}")
+async def update_journal_file(filename: str, request: Request):
+    if Path(filename).suffix.lower() != ".journal":
+        raise HTTPException(status_code=404, detail="File not found")
+    journal_path = resolve_data_file(JOURNAL_DIR, filename)
+    data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Invalid journal update")
+    content = data.get("content")
+    original_content = data.get("original_content")
+    if not isinstance(content, str) or not isinstance(original_content, str):
+        raise HTTPException(status_code=400, detail="Invalid journal update")
+
+    with journal_path.open("r", encoding="utf-8", newline="") as journal_file:
+        current_content = journal_file.read()
+    normalized_current = current_content.replace("\r\n", "\n").replace("\r", "\n")
+    if normalized_current != original_content:
+        raise HTTPException(status_code=409, detail="Journal file changed; reload before editing")
+
+    newline = "\r\n" if "\r\n" in current_content else "\n"
+    updated_content = content.replace("\r\n", "\n").replace("\r", "\n").replace("\n", newline)
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="", dir=journal_path.parent,
+            delete=False,
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+            temp_file.write(updated_content)
+        os.replace(temp_path, journal_path)
+    finally:
+        if temp_path and temp_path.exists():
+            temp_path.unlink()
+
+    return {"success": True}
 
 @app.get("/register")
 def register(
