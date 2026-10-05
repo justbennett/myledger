@@ -456,11 +456,11 @@ def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
 
-@app.get("/add-data", response_class=HTMLResponse)
+@app.get("/move-data", response_class=HTMLResponse)
 def add_data(request: Request):
     return templates.TemplateResponse(
         request,
-        "add-data.html"
+        "move-data.html"
     )
 
 @app.get("/journal")

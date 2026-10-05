@@ -47,7 +47,7 @@ New transactions can also be added to an existing journal from the web interface
 
 ### CSV Import
 
-The **Add Data** page provides a workflow for importing CSV financial data using hledger CSV rules.
+The **Data Management** page provides a workflow for importing CSV financial data using hledger CSV rules.
 
 The import workflow supports:
 
@@ -138,13 +138,13 @@ and CSV source files in:
 data/
 ```
 
-The Add Data page will automatically discover files in those directories.
+The Data Management page will automatically discover files in those directories.
 
 ### Import workflow
 
 From the web interface:
 
-1. Open **Add Data**
+1. Open **Data Management**
 2. Select a CSV file
 3. Select the corresponding rules file
 4. Select the destination journal

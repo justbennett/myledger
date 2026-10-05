@@ -388,7 +388,7 @@ li {
   color: #1e293b;
 }
 
-main.add-data-main {
+main.move-data-main {
   display: block;
 }
 
@@ -746,7 +746,7 @@ section h2 {
 }
 
 @media (max-width: 520px) {
-  main.add-data-main {
+  main.move-data-main {
     padding: 1rem;
   }
 

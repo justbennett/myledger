@@ -4,7 +4,7 @@
   <sup title="{{ title }}" style="cursor: help; font-size:small"><a href="{{ link }}" target="_blank">⍰</a></sup>
 {%- endmacro %}
 <!-- Assign the title, subtitle, and links variables -->
-{% set title = "Add Data" %}
+{% set title = "Data Management" %}
 {% set subtitle = "Upload and import new transaction data into your ledger." %}
 {% set links = [
     {"href": "/", "text": "Dashboard"},
@@ -20,7 +20,7 @@
 </head>
 <body>
   {% include 'header.html' %}
-  <main class="add-data-main">
+  <main class="move-data-main">
     <div id="upload-flow-container">
         <div id="csv-uploader">
           <h2>Import New Data {{ help_icon('https://hledger.org/1.52/hledger.html#import', "Select CSV file to import transaction data") }}</h2>
@@ -177,7 +177,7 @@
       </form>
     </dialog>
     {% include 'footer.html' %}
-    <script src="/static/js/add-data.js?v=7"></script>
+    <script src="/static/js/move-data.js?v=7"></script>
 </body>
 </html>
 
