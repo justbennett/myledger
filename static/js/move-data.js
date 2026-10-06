@@ -646,19 +646,15 @@ document.getElementById('import-data')?.addEventListener('click', async () => {
 // MyLedger updates
 // -------------------------
 
-let updateCheckInProgress = false;
+
 
 async function checkForUpdates() {
-  if (updateCheckInProgress) return;
 
-  updateCheckInProgress = true;
 
-  const checkButton = document.getElementById('check-updates');
   const updateButton = document.getElementById('update-my-ledger');
   const version = document.getElementById('update-version');
   const status = document.getElementById('update-status');
 
-  checkButton.disabled = true;
   updateButton.hidden = true;
   status.textContent = 'Checking GitHub...';
 
@@ -669,6 +665,13 @@ async function checkForUpdates() {
 
     if (!response.ok) {
       throw new Error(result.detail || 'Unable to check for updates');
+    }
+
+  if (!result.available) {
+      version.textContent = '';
+      status.textContent = result.message;
+      updateButton.hidden = true;
+      return;
     }
 
     const currentShort = result.current.substring(0, 7);
@@ -686,21 +689,12 @@ async function checkForUpdates() {
 
   } catch (error) {
     status.textContent = error.message;
-  } finally {
-    checkButton.disabled = false;
-    updateCheckInProgress = false;
-  }
+  } 
 }
-
-document.getElementById('check-updates')?.addEventListener(
-  'click',
-  checkForUpdates
-);
 
 document.getElementById('update-my-ledger')?.addEventListener(
   'click',
   async () => {
-    const checkButton = document.getElementById('check-updates');
     const updateButton = document.getElementById('update-my-ledger');
     const version = document.getElementById('update-version');
     const status = document.getElementById('update-status');

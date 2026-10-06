@@ -459,6 +459,15 @@ def logout(request: Request):
 
 @app.get("/update-status")
 def update_status():
+
+    deploy_script = "/usr/local/bin/myledger-deploy"
+
+    if not os.path.exists(deploy_script):
+        return {
+            "available": False,
+            "message": "Updates are available only on the production server.",
+        }
+    
     result = subprocess.run(
         ["/usr/local/bin/myledger-deploy", "--check"],
         capture_output=True,
