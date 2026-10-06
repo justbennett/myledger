@@ -499,6 +499,7 @@ def update_status():
         "update_available": result.returncode == 10,
         "current": current,
         "remote": remote,
+        "available": True
     }
 
 
