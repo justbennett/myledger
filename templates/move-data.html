@@ -80,37 +80,53 @@
           <a href="#" type="button" id="journal-edit-button" title="Warning: editing production journal files can be dangerous. Make sure you have a backup before saving changes.">Edit Journal File⚠️</a>
         </div>
     </div>
-        <div id="dry-run-section">
-          
-          <h2>Dry Run Results {{ help_icon('https://hledger.org/1.52/hledger.html#import-dry-run', "View the results of the dry run") }}</h2>
-          <button id="dry-run" class="dark">Execute Dry Run</button>
-          <button id="import-data" class="dark" type="button" disabled style="display: none;">Import Data</button>
-          <div id="dry-run-results" style="display: none;">
-            <div class="dry-run-view-tabs" role="tablist" aria-label="Dry run preview format">
-              <button type="button" id="dry-run-journal-tab" class="dry-run-view-tab active" role="tab" aria-selected="true" aria-controls="dry-run-journal-view">Journal</button>
-              <button type="button" id="dry-run-text-tab" class="dry-run-view-tab" role="tab" aria-selected="false" aria-controls="dry-run-text-view">Plain text</button>
-            </div>
-            <p id="dry-run-preview-status" role="status" aria-live="polite"></p>
-            <div id="dry-run-journal-view" role="tabpanel" aria-labelledby="dry-run-journal-tab">
-              <table id="dry-run-journal-table" class="journal-preview-table">
-                <thead>
-                  <tr>
-                    <th>Date</th>
-                    <th>Description</th>
-                    <th>Account</th>
-                    <th style="text-align:right;">Amount</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-            <div id="dry-run-text-view" role="tabpanel" aria-labelledby="dry-run-text-tab" hidden>
-              <pre id="dry-run-details"></pre>
-            </div>
-          </div>
-        </div>
-    </main>
 
+
+    <div id="dry-run-section">
+      
+      <h2>Dry Run Results {{ help_icon('https://hledger.org/1.52/hledger.html#import-dry-run', "View the results of the dry run") }}</h2>
+      <button id="dry-run" class="dark">Execute Dry Run</button>
+      <button id="import-data" class="dark" type="button" disabled style="display: none;">Import Data</button>
+      <div id="dry-run-results" style="display: none;">
+        <div class="dry-run-view-tabs" role="tablist" aria-label="Dry run preview format">
+          <button type="button" id="dry-run-journal-tab" class="dry-run-view-tab active" role="tab" aria-selected="true" aria-controls="dry-run-journal-view">Journal</button>
+          <button type="button" id="dry-run-text-tab" class="dry-run-view-tab" role="tab" aria-selected="false" aria-controls="dry-run-text-view">Plain text</button>
+        </div>
+        <p id="dry-run-preview-status" role="status" aria-live="polite"></p>
+        <div id="dry-run-journal-view" role="tabpanel" aria-labelledby="dry-run-journal-tab">
+          <table id="dry-run-journal-table" class="journal-preview-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Account</th>
+                <th style="text-align:right;">Amount</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="dry-run-text-view" role="tabpanel" aria-labelledby="dry-run-text-tab" hidden>
+          <pre id="dry-run-details"></pre>
+        </div>
+      </div>
+    </div>
+        <div id="update-section">
+      
+      <h2>MyLedger Updates</h2>
+      <p id="update-version">Checking for updates...</p>
+      <p id="update-status" role="status" aria-live="polite"></p>
+      <button id="check-updates" class="dark" type="button">
+        Check for Updates
+      </button>
+      <button id="update-my-ledger" class="dark" type="button" hidden>
+        Update MyLedger
+      </button>
+    </div>
+  </main>
+
+
+  <!-- Dialogs -->
     <dialog id="rules-editor" aria-labelledby="rules-editor-title">
       <form id="rules-editor-form">
         <div class="journal-editor-header">
@@ -177,6 +193,6 @@
       </form>
     </dialog>
     {% include 'footer.html' %}
-    <script src="/static/js/move-data.js?v=7"></script>
+    <script src="/static/js/move-data.js?v=8"></script>
 </body>
 </html>

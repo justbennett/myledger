@@ -641,13 +641,155 @@ document.getElementById('import-data')?.addEventListener('click', async () => {
   pendingImport = null;
   alert('Data imported successfully');
 });
- 
+
+// -------------------------
+// MyLedger updates
+// -------------------------
+
+let updateCheckInProgress = false;
+
+async function checkForUpdates() {
+  if (updateCheckInProgress) return;
+
+  updateCheckInProgress = true;
+
+  const checkButton = document.getElementById('check-updates');
+  const updateButton = document.getElementById('update-my-ledger');
+  const version = document.getElementById('update-version');
+  const status = document.getElementById('update-status');
+
+  checkButton.disabled = true;
+  updateButton.hidden = true;
+  status.textContent = 'Checking GitHub...';
+
+  try {
+    const response = await fetch('/update-status');
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.detail || 'Unable to check for updates');
+    }
+
+    const currentShort = result.current.substring(0, 7);
+    const remoteShort = result.remote.substring(0, 7);
+
+    version.textContent =
+      `Installed: ${currentShort}    GitHub: ${remoteShort}`;
+
+    if (result.update_available) {
+      status.textContent = 'An update is available.';
+      updateButton.hidden = false;
+    } else {
+      status.textContent = 'MyLedger is up to date.';
+    }
+
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    checkButton.disabled = false;
+    updateCheckInProgress = false;
+  }
+}
+
+document.getElementById('check-updates')?.addEventListener(
+  'click',
+  checkForUpdates
+);
+
+document.getElementById('update-my-ledger')?.addEventListener(
+  'click',
+  async () => {
+    const checkButton = document.getElementById('check-updates');
+    const updateButton = document.getElementById('update-my-ledger');
+    const version = document.getElementById('update-version');
+    const status = document.getElementById('update-status');
+
+    if (!confirm(
+      'Update MyLedger now?\n\n' +
+      'The application will restart automatically.'
+    )) {
+      return;
+    }
+
+    checkButton.disabled = true;
+    updateButton.disabled = true;
+    status.textContent = 'Updating MyLedger...';
+    version.textContent = 'Please wait...';
+
+    try {
+      const response = await fetch('/update', {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || 'Unable to start update');
+      }
+
+      status.textContent =
+        'Update started. Waiting for MyLedger to restart...';
+
+      waitForRestart();
+
+    } catch (error) {
+      status.textContent = error.message;
+      checkButton.disabled = false;
+      updateButton.disabled = false;
+    }
+  }
+);
+
+async function waitForRestart() {
+  const status = document.getElementById('update-status');
+
+  // Give the deployment process time to restart the service.
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  let attempts = 0;
+  const maxAttempts = 30;
+
+  const check = async () => {
+    attempts++;
+
+    try {
+      const response = await fetch(`/update-status?t=${Date.now()}`);
+
+      if (response.ok) {
+        const result = await response.json();
+
+        if (!result.update_available) {
+          window.location.reload();
+          return;
+        }
+      }
+    } catch (error) {
+      // Server is probably restarting. Keep waiting.
+    }
+
+    if (attempts >= maxAttempts) {
+      status.textContent =
+        'The update may still be running. Refresh the page in a moment.';
+      return;
+    }
+
+    status.textContent =
+      `Waiting for MyLedger to restart... (${attempts}/${maxAttempts})`;
+
+    setTimeout(check, 2000);
+  };
+
+  check();
+}
+
 // Initialization
 // -------------------------
 document.addEventListener('DOMContentLoaded', function() {
   loadFileList('data-files', 'data-select');
   loadFileList('rules', 'rules-select');
   loadJournalList();
+  checkForUpdates();
 });
 
 

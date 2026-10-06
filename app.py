@@ -457,6 +457,62 @@ def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
 
+@app.get("/update-status")
+def update_status():
+    result = subprocess.run(
+        ["/usr/local/bin/myledger-deploy", "--check"],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode not in (0, 10):
+        raise HTTPException(
+            status_code=500,
+            detail=result.stderr.strip() or result.stdout.strip() or "Unable to check for updates",
+        )
+
+    current = None
+    remote = None
+
+    for line in result.stdout.splitlines():
+        if line.startswith("Production:"):
+            current = line.split(":", 1)[1].strip()
+        elif line.startswith("GitHub:"):
+            remote = line.split(":", 1)[1].strip()
+
+    if not current or not remote:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to determine installed and GitHub versions",
+        )
+
+    return {
+        "update_available": result.returncode == 10,
+        "current": current,
+        "remote": remote,
+    }
+
+
+@app.post("/update")
+def update():
+    try:
+        subprocess.Popen(
+            ["/usr/local/bin/myledger-deploy"],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to start update: {error}",
+        )
+
+    return {
+        "success": True,
+        "message": "Update started. MyLedger will restart automatically.",
+    }
+
 @app.get("/move-data", response_class=HTMLResponse)
 def add_data(request: Request):
     return templates.TemplateResponse(
