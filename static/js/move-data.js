@@ -649,31 +649,31 @@ document.getElementById('import-data')?.addEventListener('click', async () => {
 
 
 async function checkForUpdates() {
-
-
   const updateButton = document.getElementById('update-my-ledger');
   const version = document.getElementById('update-version');
   const status = document.getElementById('update-status');
 
   updateButton.hidden = true;
-  status.textContent = 'Checking GitHub...';
+  status.textContent = 'Checking for updates...';
 
   try {
     const response = await fetch('/update-status');
-
     const result = await response.json();
 
     if (!response.ok) {
-      throw new Error(result.detail || 'Unable to check for updates');
+      throw new Error(
+        result.detail || 'Unable to check for updates'
+      );
     }
 
-  if (!result.available) {
+    // Local development environment
+    if (!result.available) {
       version.textContent = '';
       status.textContent = result.message;
-      updateButton.hidden = true;
       return;
     }
 
+    // Production environment
     const currentShort = result.current.substring(0, 7);
     const remoteShort = result.remote.substring(0, 7);
 
@@ -688,52 +688,10 @@ async function checkForUpdates() {
     }
 
   } catch (error) {
+    version.textContent = '';
     status.textContent = error.message;
-  } 
-}
-
-document.getElementById('update-my-ledger')?.addEventListener(
-  'click',
-  async () => {
-    const updateButton = document.getElementById('update-my-ledger');
-    const version = document.getElementById('update-version');
-    const status = document.getElementById('update-status');
-
-    if (!confirm(
-      'Update MyLedger now?\n\n' +
-      'The application will restart automatically.'
-    )) {
-      return;
-    }
-
-    checkButton.disabled = true;
-    updateButton.disabled = true;
-    status.textContent = 'Updating MyLedger...';
-    version.textContent = 'Please wait...';
-
-    try {
-      const response = await fetch('/update', {
-        method: 'POST',
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.detail || 'Unable to start update');
-      }
-
-      status.textContent =
-        'Update started. Waiting for MyLedger to restart...';
-
-      waitForRestart();
-
-    } catch (error) {
-      status.textContent = error.message;
-      checkButton.disabled = false;
-      updateButton.disabled = false;
-    }
   }
-);
+};
 
 async function waitForRestart() {
   const status = document.getElementById('update-status');
