@@ -698,6 +698,91 @@ async function checkForUpdates() {
   }
 }
 
+document.getElementById('update-my-ledger')?.addEventListener(
+  'click',
+  async () => {
+    const updateButton = document.getElementById('update-my-ledger');
+    const version = document.getElementById('update-version');
+    const status = document.getElementById('update-status');
+
+    if (!confirm(
+      'Update MyLedger now?\n\n' +
+      'The application will restart automatically.'
+    )) {
+      return;
+    }
+
+    updateButton.disabled = true;
+    status.textContent = 'Updating MyLedger...';
+    version.textContent = 'Please wait...';
+
+    try {
+      const response = await fetch('/update', {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.detail || 'Unable to start update'
+        );
+      }
+
+      status.textContent =
+        'Update started. Waiting for MyLedger to restart...';
+
+      waitForRestart();
+
+    } catch (error) {
+      status.textContent = `Update failed: ${error.message}`;
+      updateButton.disabled = false;
+    }
+  }
+);
+
+async function waitForRestart() {
+  const status = document.getElementById('update-status');
+
+  // Give the deployment process time to restart the service.
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  let attempts = 0;
+  const maxAttempts = 30;
+
+  const check = async () => {
+    attempts++;
+
+    try {
+      const response = await fetch(`/update-status?t=${Date.now()}`);
+
+      if (response.ok) {
+        const result = await response.json();
+
+        if (result.available && !result.update_available) {
+          window.location.reload();
+          return;
+        }
+      }
+    } catch (error) {
+      // The server is probably restarting.
+    }
+
+    if (attempts >= maxAttempts) {
+      status.textContent =
+        'The update may still be running. Refresh the page in a moment.';
+      return;
+    }
+
+    status.textContent =
+      `Waiting for MyLedger to restart... (${attempts}/${maxAttempts})`;
+
+    setTimeout(check, 2000);
+  };
+
+  check();
+}
+
 // Initialization
 // -------------------------
 document.addEventListener('DOMContentLoaded', function() {
