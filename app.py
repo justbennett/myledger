@@ -2,6 +2,7 @@
 # To run: .\.venv\Scripts\Activate.ps1
 # Then: python -m uvicorn app:app --reload
 # Go to http://127.0.0.1:8000/
+#Version 0.1.0 
 
 import cmd
 import hmac
