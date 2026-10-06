@@ -661,7 +661,10 @@ async function checkForUpdates() {
     const result = await response.json();
 
     console.log('Update status response:', response.status, result);
-
+    console.log('version element:', version);
+    console.log('status element:', status);
+    console.log('update button:', updateButton);
+    
     if (!response.ok) {
       throw new Error(
         result.detail || 'Unable to check for updates'
