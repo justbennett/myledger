@@ -664,7 +664,7 @@ async function checkForUpdates() {
     console.log('version element:', version);
     console.log('status element:', status);
     console.log('update button:', updateButton);
-    
+
     if (!response.ok) {
       throw new Error(
         result.detail || 'Unable to check for updates'
@@ -681,7 +681,7 @@ async function checkForUpdates() {
     const remoteShort = result.remote.substring(0, 7);
 
     version.textContent =
-      `Installed: ${currentShort}    GitHub: ${remoteShort}`;
+      `Installed: ${currentShort} <br>GitHub: ${remoteShort}`;
 
     if (result.update_available) {
       status.textContent = 'An update is available.';
