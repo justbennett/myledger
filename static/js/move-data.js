@@ -660,20 +660,20 @@ async function checkForUpdates() {
     const response = await fetch('/update-status');
     const result = await response.json();
 
+    console.log('Update status response:', response.status, result);
+
     if (!response.ok) {
       throw new Error(
         result.detail || 'Unable to check for updates'
       );
     }
 
-    // Local development environment
     if (!result.available) {
       version.textContent = '';
       status.textContent = result.message;
       return;
     }
 
-    // Production environment
     const currentShort = result.current.substring(0, 7);
     const remoteShort = result.remote.substring(0, 7);
 
@@ -688,51 +688,11 @@ async function checkForUpdates() {
     }
 
   } catch (error) {
+    console.error('Update check failed:', error);
+
     version.textContent = '';
-    status.textContent = error.message;
+    status.textContent = `Update check failed: ${error.message}`;
   }
-};
-
-async function waitForRestart() {
-  const status = document.getElementById('update-status');
-
-  // Give the deployment process time to restart the service.
-  await new Promise(resolve => setTimeout(resolve, 3000));
-
-  let attempts = 0;
-  const maxAttempts = 30;
-
-  const check = async () => {
-    attempts++;
-
-    try {
-      const response = await fetch(`/update-status?t=${Date.now()}`);
-
-      if (response.ok) {
-        const result = await response.json();
-
-        if (!result.update_available) {
-          window.location.reload();
-          return;
-        }
-      }
-    } catch (error) {
-      // Server is probably restarting. Keep waiting.
-    }
-
-    if (attempts >= maxAttempts) {
-      status.textContent =
-        'The update may still be running. Refresh the page in a moment.';
-      return;
-    }
-
-    status.textContent =
-      `Waiting for MyLedger to restart... (${attempts}/${maxAttempts})`;
-
-    setTimeout(check, 2000);
-  };
-
-  check();
 }
 
 // Initialization
