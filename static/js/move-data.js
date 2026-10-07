@@ -681,7 +681,7 @@ async function checkForUpdates() {
     const remoteShort = result.remote.substring(0, 7);
 
     version.textContent =
-      `Installed: ${currentShort} <br>GitHub: ${remoteShort}`;
+      `Installed: ${currentShort} \r\nGitHub: ${remoteShort}`;
 
     if (result.update_available) {
       status.textContent = 'An update is available.';
