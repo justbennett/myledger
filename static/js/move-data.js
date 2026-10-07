@@ -650,7 +650,8 @@ document.getElementById('import-data')?.addEventListener('click', async () => {
 
 async function checkForUpdates() {
   const updateButton = document.getElementById('update-my-ledger');
-  const version = document.getElementById('update-version');
+  const remote = document.getElementById('remote-version');
+  const current = document.getElementById('current-version');
   const status = document.getElementById('update-status');
 
   updateButton.hidden = true;
@@ -661,7 +662,8 @@ async function checkForUpdates() {
     const result = await response.json();
 
     console.log('Update status response:', response.status, result);
-    console.log('version element:', version);
+    console.log('remote element:', remote);
+    console.log('current element:', current);
     console.log('status element:', status);
     console.log('update button:', updateButton);
 
@@ -672,7 +674,8 @@ async function checkForUpdates() {
     }
 
     if (!result.available) {
-      version.textContent = '';
+      remote.textContent = '';
+      current.textContent = '';
       status.textContent = result.message;
       return;
     }
@@ -680,8 +683,10 @@ async function checkForUpdates() {
     const currentShort = result.current.substring(0, 7);
     const remoteShort = result.remote.substring(0, 7);
 
-    version.textContent =
-      `Installed: ${currentShort} \r\nGitHub: ${remoteShort}`;
+    current.textContent =
+      `Installed: ${currentShort}`;
+    remote.textContent =
+      `GitHub: ${remoteShort}`;
 
     if (result.update_available) {
       status.textContent = 'An update is available.';
@@ -693,7 +698,8 @@ async function checkForUpdates() {
   } catch (error) {
     console.error('Update check failed:', error);
 
-    version.textContent = '';
+    remote.textContent = '';
+    current.textContent = '';
     status.textContent = `Update check failed: ${error.message}`;
   }
 }
@@ -702,7 +708,8 @@ document.getElementById('update-my-ledger')?.addEventListener(
   'click',
   async () => {
     const updateButton = document.getElementById('update-my-ledger');
-    const version = document.getElementById('update-version');
+    const remote = document.getElementById('remote-version');
+    const current = document.getElementById('current-version');
     const status = document.getElementById('update-status');
 
     if (!confirm(
