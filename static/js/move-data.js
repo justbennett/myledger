@@ -689,10 +689,10 @@ async function checkForUpdates() {
       `GitHub: ${remoteShort}`;
 
     if (result.update_available) {
-      status.textContent = 'An update is available.';
+      status.textContent = '<span style="display: inline-block; font-size: 39px; color: #75ea00;">🢛</span>An update is available.';
       updateButton.hidden = false;
     } else {
-      status.textContent = 'MyLedger is up to date.';
+      status.textContent = '✔ MyLedger is up to date.';
     }
 
   } catch (error) {
@@ -721,7 +721,7 @@ document.getElementById('update-my-ledger')?.addEventListener(
 
     updateButton.disabled = true;
     status.textContent = 'Updating MyLedger...';
-    version.textContent = 'Please wait...';
+    current.textContent = 'Please wait...';
 
     try {
       const response = await fetch('/update', {

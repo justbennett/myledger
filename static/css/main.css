@@ -684,6 +684,14 @@ section h2 {
   color: #475569;
 }
 
+#update-section {
+	border: 1px solid #e7e3e3;
+	width: fit-content;
+	margin: 10px;
+	padding: 5px;
+  margin-top: 2rem;
+}
+
 @media (max-width: 600px) {
   #journal-editor,
   #rules-editor,
