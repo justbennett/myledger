@@ -111,7 +111,11 @@
         </div>
       </div>
     </div>
-    <div id="update-section">
+     </main>
+        {% include 'footer.html' %}
+    <!-- Center the update section-->
+    <div style="display: flex; justify-content: center;">
+        <div id="update-section">
       
       <b >Updates</b>
       <pre id="remote-version" style="white-space: pre; margin: 0;">Checking Versions...</pre>
@@ -122,8 +126,9 @@
         Update App
       </button>
     </div>
+    </div>
 
-  </main>
+ 
 
 
   <!-- Dialogs -->
@@ -192,7 +197,7 @@
         </div>
       </form>
     </dialog>
-    {% include 'footer.html' %}
+
     <script src="/static/js/move-data.js?v=11"></script>
 </body>
 </html>
