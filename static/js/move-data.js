@@ -149,6 +149,15 @@ let activeJournalContent = '';
 document.getElementById('journal-select')?.addEventListener('change', async function() {
   const sel = this.value;
   const editButton = document.getElementById('journal-edit-button');
+  activeJournalName = '';
+  activeJournalContent = '';
+  editButton.hidden = true;
+  document.getElementById('journal-viewer').style.display = 'none';
+  document.getElementById('journal-details').textContent = 'none selected';
+
+  if (!sel) {
+    return;
+  }
   
   try {
     const response = await fetch(`/journal-files/${encodeURIComponent(sel)}?t=${Date.now()}`);
@@ -239,33 +248,6 @@ document.getElementById('data-upload-button')?.addEventListener('click', () => {
 function makeObjectUrlFromText(text) {
   const blob = new Blob([text], { type: 'text/plain' });
   return URL.createObjectURL(blob);
-}
-
-async function showJournalPreview(filename) {
-  const viewer = document.getElementById('journal-viewer');
-  const details = document.getElementById('journal-details');
-  const preview = document.getElementById('journal-content');
-  if (!viewer || !details || !preview) return;
-  if (!filename) {
-    viewer.style.display = 'none';
-    return;
-  }
-
-  details.textContent = filename;
-  try {
-    const response = await fetch(`/journal-files/${encodeURIComponent(filename)}`);
-    if (!response.ok) throw new Error('Could not load journal file');
-    const text = await response.text();
-
-    if (preview.dataset.blobUrl) URL.revokeObjectURL(preview.dataset.blobUrl);
-    const url = makeObjectUrlFromText(text);
-    preview.data = url;
-    preview.dataset.blobUrl = url;
-    viewer.style.display = 'block';
-  } catch (error) {
-    details.textContent = `${filename} (preview unavailable)`;
-    console.error('Error loading journal file:', error);
-  }
 }
 
 let pendingImport = null;
@@ -401,16 +383,10 @@ async function loadJournalList() {
 
       option.value = journal;
       option.textContent = journal;
-      
-      //if a journal name matches the year like '2026.journal' then select it
-      if (journal.match(/^\d{4}\.journal$/)) {
-        option.selected = true;
-      }
       dropdown.appendChild(option);
     });
 
-    const selectedJournal = dropdown.value;
-    if (selectedJournal) showJournalPreview(selectedJournal);
+    dropdown.selectedIndex = -1;
   } catch (error) {
     console.error('Error loading journals:', error);
   }
@@ -798,5 +774,3 @@ document.addEventListener('DOMContentLoaded', function() {
   loadJournalList();
   checkForUpdates();
 });
-
-

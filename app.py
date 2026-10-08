@@ -465,7 +465,7 @@ def update_status():
     if not os.path.exists(deploy_script):
         return {
             "available": False,
-            "message": "Updates are available only on the production server.",
+            "message": "This is the local environment. Updates are available only on the production server.",
         }
     
     result = subprocess.run(

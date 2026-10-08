@@ -26,7 +26,7 @@
           <h2>Import New Data {{ help_icon('https://hledger.org/1.52/hledger.html#import', "Select CSV file to import transaction data") }}</h2>
             <div >
               <button id="data-toggle" class="select-toggle dark" >Select Data File</button>
-              <div><select id="data-select" class="list-select" multiple size="8" style="display: none;"></select></div>
+              <div><select id="data-select" class="list-select" size="8" style="display: none;"></select></div>
               <!-- options populated by JS -->
               <button id="data-upload-button" class="dark" type="button" aria-label="Upload CSV file" title="Upload CSV file">+</button>
             
@@ -49,7 +49,7 @@
           <h2>Import Rules {{ help_icon('https://hledger.org/1.52/hledger.html#csv', "Select which rules to apply") }}</h2>
             <div class="rules-file-controls">
               <button id="rules-toggle" class="select-toggle dark" type="button">Select Rules File</button>
-              <div><select id="rules-select" class="list-select" multiple size="8" style="display: none;"></select></div>
+              <div><select id="rules-select" class="list-select" size="8" style="display: none;"></select></div>
               <!-- options populated by JS -->
               </select>
               <button id="rules-create-button" class="dark" type="button" aria-label="Create new rules file" title="Create new rules file">+</button>
@@ -68,7 +68,7 @@
           <h2>Destination Journal {{ help_icon('https://hledger.org/1.52/hledger.html#journal', "Select the journal to import data into") }}</h2>
           <div class="journal-select-controls">
             <button id="journal-toggle" class="select-toggle dark" type="button">Select Journal</button>
-            <div><select id="journal-select" class="list-select" multiple size="8" style="display: none;"></select></div>
+            <div><select id="journal-select" class="list-select" size="8" style="display: none;"></select></div>
             <button id="journal-create-button" class="dark" type="button" aria-label="Create new journal file" title="Create new journal file">+</button>
           </div>
           <pre id="journal-details">none selected</pre>
@@ -77,7 +77,7 @@
             <object id="journal-content" class="file-preview" type="text/plain">
               Your browser does not support displaying the journal file.</object>
           </div>
-          <a href="#" type="button" id="journal-edit-button" title="Warning: editing production journal files can be dangerous. Make sure you have a backup before saving changes.">Edit Journal File⚠️</a>
+          <a href="#" type="button" id="journal-edit-button" hidden title="Warning: editing production journal files can be dangerous. Make sure you have a backup before saving changes.">Edit Journal File⚠️</a>
         </div>
     </div>
 
@@ -117,7 +117,7 @@
     <div style="display: flex; justify-content: center;">
         <div id="update-section">
       
-      <b >Updates</b>
+      <center><b >Updates</b></center>
       <pre id="remote-version" style="white-space: pre; margin: 0;">Checking Versions...</pre>
       <pre id="current-version" style="white-space: pre; margin: 0;"></pre>
       <p id="update-status" role="status" aria-live="polite"></p>
@@ -198,6 +198,6 @@
       </form>
     </dialog>
 
-    <script src="/static/js/move-data.js?v=11"></script>
+    <script src="/static/js/move-data.js?v=12"></script>
 </body>
 </html>
