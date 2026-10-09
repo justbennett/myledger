@@ -624,7 +624,7 @@ async function checkForUpdates() {
       `GitHub: ${remoteShort}`;
 
     if (result.update_available) {
-      status.textContent = '<span style="display: inline-block; font-size: 39px; color: #75ea00;">🢛</span>An update is available.';
+      status.innerHTML = '<span style="display: inline-block; color: #03b412;">🢛</span>An update is available.';
       updateButton.hidden = false;
     } else {
       status.textContent = '✔ MyLedger is up to date.';
