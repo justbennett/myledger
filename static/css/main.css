@@ -524,7 +524,8 @@ section h2 {
 #journal-editor,
 #rules-editor,
 #rules-create-dialog,
-#journal-download-dialog {
+#journal-download-dialog,
+#balance-download-dialog {
   max-width: none;
   max-height: calc(100vh - 2rem);
   border: 1px solid var(--theme-border-strong);
@@ -547,6 +548,10 @@ section h2 {
   width: min(32rem, calc(100vw - 2rem));
 }
 
+#balance-download-dialog {
+  width: min(32rem, calc(100vw - 2rem));
+}
+
 #csv-uploader > div:first-of-type,
 .rules-file-controls,
 .journal-select-controls {
@@ -562,14 +567,16 @@ section h2 {
 #journal-editor::backdrop,
 #rules-editor::backdrop,
 #rules-create-dialog::backdrop,
-#journal-download-dialog::backdrop {
+#journal-download-dialog::backdrop,
+#balance-download-dialog::backdrop {
   background: var(--theme-backdrop);
 }
 
 #journal-editor form,
 #rules-editor form,
 #rules-create-dialog form,
-#journal-download-form {
+#journal-download-form,
+#balance-download-form {
   display: grid;
   gap: 0.75rem;
 }
@@ -608,13 +615,16 @@ section h2 {
   background: var(--theme-surface);
 }
 
-#journal-download-format {
+#balance-download-form input,
+#journal-download-format,
+#balance-download-format {
   width: 100%;
   padding: 0.5rem;
   border: 1px solid var(--theme-border-strong);
   border-radius: 4px;
   background: var(--theme-surface);
   color: var(--theme-navy);
+  font: inherit;
   font: inherit;
 }
 
@@ -670,7 +680,8 @@ section h2 {
   #journal-editor,
   #rules-editor,
   #rules-create-dialog,
-  #journal-download-dialog {
+  #journal-download-dialog,
+  #balance-download-dialog {
     padding: 1rem;
   }
 

@@ -7,10 +7,39 @@
         <h2>Balances</h2>
         <div id="included-journals"></div>
       </div>
+      
       <div id="accounts"></div>
-
+<button type="button" id="download-balance" class="dark">Download Balance Sheet</button>
       <div id="scroll-buttons">
+      
       <a href="#top">△Top△</a>
       <a href="#bottom">▽End▽</a>
       </div>
     </section>
+
+<dialog id="balance-download-dialog" aria-labelledby="balance-download-title">
+  <form id="balance-download-form">
+    <div class="journal-editor-header">
+      <h2 id="balance-download-title">Download Balance Sheet</h2>
+      <button type="button" class="icon-button" id="balance-download-close" aria-label="Close" title="Close">×</button>
+    </div>
+    <label for="balance-download-begin">From date</label>
+    <input id="balance-download-begin" type="date">
+    <label for="balance-download-end">To date (exclusive)</label>
+    <input id="balance-download-end" type="date">
+    <label for="balance-download-depth">Account depth (leave blank for all levels)</label>
+    <input id="balance-download-depth" type="number" min="1" step="1" inputmode="numeric">
+    <label for="balance-download-format">Output format</label>
+    <select id="balance-download-format" required>
+      <option value="txt">Plain text (.txt)</option>
+      <option value="csv">CSV (.csv)</option>
+      <option value="tsv">TSV (.tsv)</option>
+      <option value="fods">OpenDocument spreadsheet (.fods)</option>
+      <option value="json">JSON (.json)</option>
+    </select>
+    <div class="journal-editor-actions">
+      <button type="button" class="dark" id="balance-download-cancel">Cancel</button>
+      <button type="submit" class="dark">Download</button>
+    </div>
+  </form>
+</dialog>

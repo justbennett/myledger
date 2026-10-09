@@ -270,9 +270,14 @@ def balance(
     begin: str | None = None,
     end: str | None = None,
     depth: int | None = None,
+    output: str | None = None,
 ):
+    supported_outputs = {"txt", "csv", "tsv", "json", "fods"}
+    if output is not None and output not in supported_outputs:
+        raise HTTPException(status_code=400, detail="Invalid balance output format")
+
     files = [str(JOURNAL_DIR / j) for j in journals.split(',')] if journals else [JOURNAL]
-    args = ["balance", "--tree", "--empty", "-O", "json"]
+    args = ["balance", "--tree", "--empty", "-O", output or "json"]
 
     if begin:
         args += ["--begin", begin]
@@ -282,6 +287,20 @@ def balance(
         args += ["--depth", str(depth)]
 
     out = hledger(args, files)
+    if output is not None:
+        media_types = {
+            "csv": "text/csv",
+            "json": "application/json",
+            "fods": "application/vnd.oasis.opendocument.spreadsheet-flat-xml",
+        }
+        return Response(
+            out,
+            media_type=media_types.get(output, "text/plain"),
+            headers={
+                "Content-Disposition": f'attachment; filename="balance-sheet.{output}"',
+            },
+        )
+
     rows = json.loads(out)
     tree = parse_hledger_rows(rows[0])  # the outermost array
     return tree

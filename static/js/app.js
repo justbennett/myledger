@@ -122,6 +122,55 @@ async function loadBalance() {
   }
 }
 
+document.getElementById("download-balance").addEventListener("click", () => {
+  document.getElementById("balance-download-dialog").showModal();
+});
+
+document.getElementById("balance-download-close").addEventListener("click", () => {
+  document.getElementById("balance-download-dialog").close();
+});
+
+document.getElementById("balance-download-cancel").addEventListener("click", () => {
+  document.getElementById("balance-download-dialog").close();
+});
+
+document.getElementById("balance-download-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const outputFormat = document.getElementById("balance-download-format").value;
+  const params = new URLSearchParams({
+    journals: selectedJournals.join(","),
+    output: outputFormat,
+  });
+  const begin = document.getElementById("balance-download-begin").value;
+  const end = document.getElementById("balance-download-end").value;
+  const depth = document.getElementById("balance-download-depth").value;
+  if (begin) params.set("begin", begin);
+  if (end) params.set("end", end);
+  if (depth) params.set("depth", depth);
+
+  try {
+    const response = await fetch(`/balance?${params.toString()}`);
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(detail || `HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = url;
+    downloadLink.download = `balance-sheet.${outputFormat}`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    document.getElementById("balance-download-dialog").close();
+  } catch (error) {
+    console.error("Balance sheet download failed:", error);
+    window.alert(`Balance sheet download failed: ${error.message}`);
+  }
+});
+
 async function loadRegister(account = null, query = currentJournalSearch) {
   const params = new URLSearchParams({ journals: selectedJournals.join(',') });
   if (account) params.set("account", account);

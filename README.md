@@ -302,6 +302,14 @@ GET /journal
 
 Returns the journal transactions as JSON by default. Supplying `output` requests a downloadable file in one of the supported formats: `txt`, `html`, `csv`, `fods`, `beancount`, `sql`, or `json`.
 
+### Balance
+
+```text
+GET /balance
+```
+
+Returns the account balance tree as JSON by default. Optional `begin`, `end`, and `depth` parameters limit the report; `end` is exclusive. Supplying `output` downloads the balance report in one of `txt`, `csv`, `tsv`, `json`, or `fods`.
+
 ---
 
 ## Architecture
