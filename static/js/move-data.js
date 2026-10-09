@@ -445,50 +445,9 @@ function renderDryRunJournal(transactions) {
   tbody.replaceChildren();
 
   for (const transaction of transactions) {
-    const postings = transaction.tpostings || [];
-    const firstPosting = postings[0];
-    const row = document.createElement("tr");
-    const values = [
-      transaction.tdate || "",
-      transaction.tdescription || "",
-      firstPosting?.paccount || "",
-      firstPosting ? formatJournalAmount(firstPosting.pamount || []) : "",
-    ];
-    for (const value of values) {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      row.appendChild(cell);
-    }
-    row.lastElementChild.className = "amount";
-    tbody.appendChild(row);
-
-    if (transaction.tcomment || postings.length > 1) {
-      const detailsRow = document.createElement("tr");
-      detailsRow.className = "dry-run-detail-row";
-      const detailsCell = document.createElement("td");
-      detailsCell.colSpan = 4;
-      if (transaction.tcomment) {
-        const comment = document.createElement("p");
-        comment.className = "comment";
-        comment.textContent = transaction.tcomment.trim();
-        detailsCell.appendChild(comment);
-      }
-      const postingTable = document.createElement("table");
-      postingTable.className = "journal-postings";
-      for (const posting of postings.slice(1)) {
-        const postingRow = document.createElement("tr");
-        const accountCell = document.createElement("td");
-        accountCell.textContent = `↳ ${posting.paccount || ""}`;
-        const amountCell = document.createElement("td");
-        amountCell.className = "amount";
-        amountCell.textContent = formatJournalAmount(posting.pamount || []);
-        postingRow.append(accountCell, amountCell);
-        postingTable.appendChild(postingRow);
-      }
-      detailsCell.appendChild(postingTable);
-      detailsRow.appendChild(detailsCell);
-      tbody.appendChild(detailsRow);
-    }
+    tbody.appendChild(renderJournalTableRow(transaction, {
+      formatAmount: formatJournalAmount,
+    }));
   }
 }
 

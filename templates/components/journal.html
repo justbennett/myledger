@@ -1,0 +1,16 @@
+<div id="{{ journal_panel_id | default('journal-table-panel') }}" class="journal-view-panel" role="tabpanel" aria-labelledby="{{ journal_tab_id | default('journal-view-tab') }}" tabindex="0">
+        <table id="{{ journal_table_id | default('journal-table') }}" class="{{ journal_table_class | default('journal-table') }}">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Account</th>
+              <th style="text-align:right;">Amount</th>
+              {% if journal_show_actions | default(true) %}
+              <th aria-label="Actions"></th>
+              {% endif %}
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>

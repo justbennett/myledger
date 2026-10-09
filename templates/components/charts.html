@@ -1,0 +1,39 @@
+      <div id="charts-panel" class="journal-view-panel chart-view" role="tabpanel" aria-labelledby="charts-view-tab" tabindex="0" hidden>
+        <div class="chart-controls">
+          <label>
+            <span>Chart</span>
+            <select id="chart-type">
+              <option value="bar">Bar</option>
+              <option value="pie">Pie</option>
+            </select>
+          </label>
+          <label>
+            <span>Account class</span>
+            <select id="chart-account-class">
+              <option value="expenses">Expenses</option>
+              <option value="income">Income</option>
+              <option value="assets">Assets</option>
+              <option value="liabilities">Liabilities</option>
+            </select>
+          </label>
+          <label>
+            <span>Group by</span>
+            <select id="chart-grouping">
+              <option value="month">Month</option>
+              <option value="account">Account</option>
+            </select>
+          </label>
+          <label id="chart-commodity-control" hidden>
+            <span>Commodity</span>
+            <select id="chart-commodity"></select>
+          </label>
+        </div>
+        <p id="chart-status" role="status" aria-live="polite"></p>
+        <div id="chart-container" class="chart-container" hidden>
+          <canvas id="journal-chart" aria-label="Journal postings chart" role="img"></canvas>
+        </div>
+        <div id="chart-excluded" class="chart-excluded" hidden>
+          <p>Excluded from pie because net value is negative:</p>
+          <ul id="chart-excluded-list"></ul>
+        </div>
+      </div>

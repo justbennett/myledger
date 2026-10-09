@@ -272,14 +272,7 @@ return tr;
 }
 
 function renderJournalRow(tx) {
-  const fragment = document.createDocumentFragment();
-
-  const transaction = tx.postings[0];
-
-  const tr = document.createElement("tr");
-  tr.classList.add("clickable-row");
   let account = tx.postings[0] ? tx.postings[0].account : null;
-  const amount = tx.postings[0] ? formatAmount(tx.postings[0].amount) : "";
   
   // if tx.description begins with "open ", use that as account, The description is in the form "open <account name>"
   // So split the description by space and take the second part as account name
@@ -288,52 +281,11 @@ function renderJournalRow(tx) {
     account = parts[1];
     tx.description = "Account opened";
   }
-  
-  // Render account name with filter icon
-  const accountLabel = renderAccountName(account);
-  tr.innerHTML = `
-  <td>${tx.date}</td>
-  <td>${tx.description}</td>
-  <td>${accountLabel.outerHTML}</td>
-  <td class="amount">${amount}</td>
-  <td class="journal-row-actions"></td>
-`;
-
-  if (tx.edit) {
-    const editButton = document.createElement("button");
-    editButton.type = "button";
-    editButton.className = "journal-edit-button";
-    editButton.textContent = "✎";
-    editButton.title = "Edit transaction";
-    editButton.setAttribute("aria-label", "Edit transaction");
-    editButton.addEventListener("click", (event) => {
-      event.stopPropagation();
-      openJournalEditor(tx.edit);
-    });
-    tr.querySelector(".journal-row-actions").appendChild(editButton);
-  }
-
-  // Expandable detail row
-  const detailTr = document.createElement("tr");
-  detailTr.classList.add("journal-detail");
-  detailTr.style.display = "none";
-  detailTr.appendChild(document.createElement("td")); // Empty cell
-  const detailTd = document.createElement("td");
-  detailTd.colSpan = 4;
-
-  detailTd.appendChild(renderJournalDetails(tx));
-  detailTr.appendChild(detailTd);
-
-  tr.addEventListener("click", (e) => {
-  if (e.target.closest(".filter-icon")) return;
-
-  detailTr.style.display =
-    detailTr.style.display === "none" ? "table-row" : "none";
-});
-
-  fragment.appendChild(tr);
-  fragment.appendChild(detailTr);
-  return fragment;
+  return renderJournalTableRow(tx, {
+    formatAmount,
+    renderAccount: () => renderAccountName(account),
+    onEdit: openJournalEditor,
+  });
 }
 
 function openJournalEditor(edit) {
@@ -641,38 +593,6 @@ function updateJournalChart() {
   });
 }
 
-function renderJournalDetails(tx) { //Details that go in the expandable section
-  const div = document.createElement("div");
-  div.className = "details-row";
-
-  if (tx.comment) {
-    const comment = document.createElement("div");
-    comment.className = "comment";
-    comment.textContent = tx.comment;
-    div.appendChild(comment);
-  }
-
-  const table = document.createElement("table");
-  table.className = "journal-postings";
-
-  for (const p of tx.postings) { 
-    //skip the first posting because it's the main one
-    if (p === tx.postings[0]) continue;
-
-    const row = document.createElement("tr");
-
-    row.innerHTML = `
-      <td>${p.account}</td>
-      <td class="amount">${formatAmount(p.amount)}</td>
-    `;
-
-    table.appendChild(row);
-  }
-
-  div.appendChild(table);
-  return div;
-}
-
 function renderSplitRows(tx) {
   if (!tx.other_accounts.length && !tx.comment) return "";
 
@@ -736,11 +656,9 @@ document
 
 function reloadJournal() {
   const params = {};
-
   if (currentAccountFilter) {
     params.account = currentAccountFilter;
   }
-
   if (currentJournalSearch) {
     params.query = currentJournalSearch;
   }

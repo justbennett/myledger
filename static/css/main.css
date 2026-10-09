@@ -458,14 +458,14 @@ section h2 {
   vertical-align: super;
 }
 
-#journal-table {
+.journal-table {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
 
-#journal-table th,
-#journal-table td {
+.journal-table th,
+.journal-table td {
   padding: .5rem;
   border-bottom: 1px solid #ddd;
 }
@@ -517,28 +517,6 @@ section h2 {
 #dry-run-journal-view[hidden],
 #dry-run-text-view[hidden] {
   display: none;
-}
-
-.journal-preview-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.journal-preview-table th,
-.journal-preview-table td {
-  padding: 0.5rem;
-  border-bottom: 1px solid #ddd;
-  text-align: left;
-  vertical-align: top;
-}
-
-.journal-preview-table .amount {
-  text-align: right;
-  white-space: nowrap;
-}
-
-.dry-run-detail-row td {
-  background: #f8fafc;
 }
 
 .journal-row-actions {

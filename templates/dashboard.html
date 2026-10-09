@@ -17,18 +17,18 @@
   <link rel="stylesheet" href="/static/css/main.css?v=2">
   <link rel="icon" type="image/png" href="/static/favicon.ico">
 </head>
-<body>
-  {% include 'header.html' %}
+<body data-page="dashboard">
+  {% include '/components/header.html' %}
 
   <main>
-    {% include 'leftbar.html' %}
-    {% include 'main-view.html' %}
+    {% include '/components/leftbar.html' %}
+    {% include '/components/main-view.html' %}
 
   </main>
 
-  {% include 'footer.html' %}
+  {% include '/components/footer.html' %}
   <script src="/static/js/vendor/chart.umd.min.js"></script>
-  <script src="/static/js/app.js?v=3"></script>
+  <script src="/static/js/journal-table.js?v=1"></script>
+  <script src="/static/js/app.js?v=4"></script>
 </body>
 </html>
-

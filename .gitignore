@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 .env
 
+
 # Private local accounting files
 /data/
 /journals/
@@ -11,5 +12,5 @@ __pycache__/
 /register.json
 /*.csv
 /myledger-data/
-*.workspace
+*.code-workspace
 process.md

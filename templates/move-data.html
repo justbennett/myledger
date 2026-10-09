@@ -18,8 +18,8 @@
   <link rel="stylesheet" href="/static/css/main.css?v=5">
   <link rel="icon" type="image/png" href="/static/favicon.ico">
 </head>
-<body>
-  {% include 'header.html' %}
+<body data-page="move-data">
+  {% include '/components/header.html' %}
   <main class="move-data-main">
     <div id="upload-flow-container">
         <div id="csv-uploader">
@@ -93,26 +93,16 @@
           <button type="button" id="dry-run-text-tab" class="dry-run-view-tab" role="tab" aria-selected="false" aria-controls="dry-run-text-view">Plain text</button>
         </div>
         <p id="dry-run-preview-status" role="status" aria-live="polite"></p>
-        <div id="dry-run-journal-view" role="tabpanel" aria-labelledby="dry-run-journal-tab">
-          <table id="dry-run-journal-table" class="journal-preview-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Description</th>
-                <th>Account</th>
-                <th style="text-align:right;">Amount</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
+        {% with journal_panel_id='dry-run-journal-view', journal_tab_id='dry-run-journal-tab', journal_table_id='dry-run-journal-table', journal_table_class='journal-table', journal_show_actions=false %}
+          {% include '/components/journal.html' %}
+        {% endwith %}
         <div id="dry-run-text-view" role="tabpanel" aria-labelledby="dry-run-text-tab" hidden>
           <pre id="dry-run-details"></pre>
         </div>
       </div>
     </div>
      </main>
-        {% include 'footer.html' %}
+        {% include '/components/footer.html' %}
     <!-- Center the update section-->
     <div style="display: flex; justify-content: center;">
         <div id="update-section">
@@ -198,6 +188,7 @@
       </form>
     </dialog>
 
-    <script src="/static/js/move-data.js?v=12"></script>
+    <script src="/static/js/journal-table.js?v=1"></script>
+    <script src="/static/js/move-data.js?v=13"></script>
 </body>
 </html>

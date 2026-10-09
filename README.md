@@ -67,13 +67,14 @@ MyLedger can work with multiple journal files.
 
 The dashboard allows journals to be selected for viewing, and the account balances, register, and journal views are generated from the selected files.
 
-The default journal is:
+The default journal is `main.journal` inside the configured ledger-data directory:
 
 ```text
-journals/main.journal
+<MYLEDGER_DATA_DIR>/journals/main.journal
 ```
 
-Additional `.journal` files can be stored in the `journals/` directory.
+Additional `.journal` files can be stored in `<MYLEDGER_DATA_DIR>/journals/`.
+`MYLEDGER_DATA_DIR` defaults to the application's working directory (`.`), so with the default configuration the path is `journals/main.journal`. Set this environment variable to keep ledger files outside the application checkout.
 
 ### hledger Integration
 
@@ -85,10 +86,10 @@ This means the journal remains a normal hledger journal and can continue to be u
 
 ## Journal Files
 
-The default journal is:
+The default journal is `main.journal` in the configured ledger-data directory:
 
 ```text
-journals/main.journal
+<MYLEDGER_DATA_DIR>/journals/main.journal
 ```
 
 A basic hledger journal might look like:
@@ -126,19 +127,19 @@ amount %amount
 
 The rules file determines how the CSV fields are mapped into hledger transactions.
 
-Place rules files in:
+Place rules files in the configured ledger-data directory:
 
 ```text
-rules/
+<MYLEDGER_DATA_DIR>/rules/
 ```
 
-and CSV source files in:
+CSV source files remain in the application's `data/` directory:
 
 ```text
 data/
 ```
 
-The Data Management page will automatically discover files in those directories.
+The Data Management page discovers rules from `<MYLEDGER_DATA_DIR>/rules/` and CSV files from `data/`.
 
 ### Import workflow
 
@@ -160,15 +161,16 @@ The dry run is intended to provide an opportunity to catch problems before modif
 
 Financial data should remain local.
 
-The repository's `.gitignore` intentionally excludes:
+The repository's `.gitignore` excludes these application-root data directories:
 
 ```text
 /data/
 /journals/
 /rules/
+/myledger-data/
 ```
 
-as well as CSV files and common Python virtual-environment files.
+as well as CSV files and common Python virtual-environment files. Keep any other `MYLEDGER_DATA_DIR` location outside the repository or add it to `.gitignore` so private ledger files are not committed.
 
 This allows the application code and example data to be committed to GitHub without committing the user's actual financial records.
 
@@ -346,6 +348,38 @@ Chart.js is included in the repository under:
 ```text
 static/js/vendor/
 ```
+
+### Frontend Structure
+
+Jinja page templates are in `templates/`. Shared dashboard and page fragments are in `templates/components/`.
+
+```text
+templates/
+├── components/
+│   ├── charts.html
+│   ├── footer.html
+│   ├── header.html
+│   ├── journal.html
+│   ├── leftbar.html
+│   ├── main-view.html
+│   └── register.html
+├── dashboard.html
+├── login.html
+└── move-data.html
+
+static/
+├── css/
+│   └── main.css
+└── js/
+    ├── app.js
+    ├── journal-table.js
+    ├── move-data.js
+    └── vendor/
+        ├── CHARTJS-LICENSE.md
+        └── chart.umd.min.js
+```
+
+`app.js` and `move-data.js` contain page-specific behavior. The shared `journal-table.js` renderer is loaded by both pages that display the journal table.
 
 ---
 
