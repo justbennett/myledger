@@ -15,7 +15,7 @@
 <html>
 <head>
   <title>Hledger {{title}}</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=5">
+  <link rel="stylesheet" href="/static/css/main.css?v=7">
   <link rel="icon" type="image/png" href="/static/favicon.ico">
 </head>
 <body data-page="move-data">
@@ -88,12 +88,12 @@
       <button id="dry-run" class="dark">Execute Dry Run</button>
       <button id="import-data" class="dark" type="button" disabled style="display: none;">Import Data</button>
       <div id="dry-run-results" style="display: none;">
-        <div class="dry-run-view-tabs" role="tablist" aria-label="Dry run preview format">
-          <button type="button" id="dry-run-journal-tab" class="dry-run-view-tab active" role="tab" aria-selected="true" aria-controls="dry-run-journal-view">Journal</button>
-          <button type="button" id="dry-run-text-tab" class="dry-run-view-tab" role="tab" aria-selected="false" aria-controls="dry-run-text-view">Plain text</button>
+        <div class="journal-view-tabs" role="tablist" aria-label="Dry run preview format">
+          <button type="button" id="dry-run-journal-tab" class="journal-view-tab active" role="tab" aria-selected="true" aria-controls="dry-run-journal-view">Journal</button>
+          <button type="button" id="dry-run-text-tab" class="journal-view-tab" role="tab" aria-selected="false" aria-controls="dry-run-text-view">Plain text</button>
         </div>
         <p id="dry-run-preview-status" role="status" aria-live="polite"></p>
-        {% with journal_panel_id='dry-run-journal-view', journal_tab_id='dry-run-journal-tab', journal_table_id='dry-run-journal-table', journal_table_class='journal-table', journal_show_actions=false %}
+        {% with journal_panel_id='dry-run-journal-view', journal_tab_id='dry-run-journal-tab', journal_table_id='dry-run-journal-table', journal_show_actions=false %}
           {% include '/components/journal.html' %}
         {% endwith %}
         <div id="dry-run-text-view" role="tabpanel" aria-labelledby="dry-run-text-tab" hidden>

@@ -82,6 +82,7 @@ ul {
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 th,
@@ -168,7 +169,7 @@ li {
   border: 0;
   border-bottom: 2px solid transparent;
   border-radius: 0;
-  padding: 0.55rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   margin: 0;
 }
 
@@ -347,24 +348,6 @@ li {
   /* pointer on hover */
 }
 
-.account-balance {
-  text-align: right;
-  font-family: monospace;
-}
-
-.clickable-row {
-  cursor: pointer;
-}
-
-.clickable-row:hover {
-  background: #f1f5f9;
-}
-
-.details-row {
-  background: #f8fafc;
-  padding: 0.5rem 1rem;
-}
-
 .comment {
   margin-bottom: 0.5rem;
   color: #475569;
@@ -462,18 +445,6 @@ section h2 {
   vertical-align: super;
 }
 
-.journal-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.journal-table th,
-.journal-table td {
-  padding: .5rem;
-  border-bottom: 1px solid #ddd;
-}
-
 .clickable-row {
   cursor: pointer;
 }
@@ -491,34 +462,11 @@ section h2 {
   padding: 0.25rem 0.5rem;
 }
 
-.dry-run-view-tabs {
-  display: flex;
-  gap: 0.25rem;
-  margin: 0.75rem 0;
-  border-bottom: 1px solid #cbd5e1;
-}
-
-.dry-run-view-tab {
-  margin: 0;
-  padding: 0.5rem 0.75rem;
-  color: #475569;
-  background: transparent;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-}
-
-.dry-run-view-tab.active {
-  color: #0f625c;
-  border-bottom-color: #167d75;
-}
-
 #dry-run-preview-status {
   color: #475569;
   font-size: 0.9rem;
 }
 
-#dry-run-journal-view[hidden],
 #dry-run-text-view[hidden] {
   display: none;
 }
@@ -545,29 +493,23 @@ section h2 {
 #journal-editor,
 #rules-editor,
 #rules-create-dialog {
-  width: min(760px, calc(100vw - 2rem));
   max-width: none;
-  border: 1px solid #cbd5e1;
-  padding: 1.25rem;
-}
-
-#rules-editor {
-  width: min(960px, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
   box-sizing: border-box;
+  max-height: calc(100vh - 2rem);
   border: 1px solid #94a3b8;
   border-radius: 6px;
   background: #fff;
   color: #1e293b;
+  padding: 1.25rem;
+}
+
+#journal-editor,
+#rules-editor {
+  width: min(960px, calc(100vw - 2rem));
 }
 
 #rules-create-dialog {
   width: min(30rem, calc(100vw - 2rem));
-  box-sizing: border-box;
-  border: 1px solid #94a3b8;
-  border-radius: 6px;
-  background: #fff;
-  color: #1e293b;
 }
 
 #csv-uploader > div:first-of-type,
@@ -578,9 +520,9 @@ section h2 {
   align-items: center;
 }
 
-#destination-journal {
+/*#destination-journal {
   position: relative;
-}
+}*/
 
 #journal-editor::backdrop,
 #rules-editor::backdrop,
@@ -637,6 +579,8 @@ section h2 {
   padding: 0.75rem;
   border: 1px solid #94a3b8;
   border-radius: 4px;
+  background: #fff;
+  color: #1e293b;
   font: 0.9rem/1.5 ui-monospace, Consolas, monospace;
   white-space: pre;
 }
@@ -649,6 +593,7 @@ section h2 {
   border-radius: 4px;
 }
 
+#journal-entry-content,
 #rules-editor-content {
   height: min(60vh, 38rem);
   min-height: 24rem;
@@ -686,11 +631,7 @@ section h2 {
     min-height: 14rem;
   }
 
-  #rules-editor {
-    width: calc(100vw - 2rem);
-    max-height: calc(100vh - 2rem);
-  }
-
+  #journal-entry-content,
   #rules-editor-content {
     height: 55vh;
   }
@@ -776,7 +717,6 @@ section h2 {
   border-radius: 4px;
 }
 
-.select-toggle,
 button {
   margin-left: 0.5rem;
   padding: 0.4rem 0.6rem;
