@@ -18,6 +18,7 @@ The main dashboard provides:
 * Support for selecting multiple journal files
 * Journal transaction view
 * Register view
+* Download selected journals as a plain-text file
 * Charts for:
 
   * Expenses
@@ -292,6 +293,14 @@ GET /rules/{filename}
 ```
 
 These endpoints provide the files used by the import interface.
+
+### Journal
+
+```text
+GET /journal
+```
+
+Returns the journal transactions as JSON by default. Supplying `output` requests a downloadable file in one of the supported formats: `txt`, `html`, `csv`, `fods`, `beancount`, `sql`, or `json`.
 
 ---
 

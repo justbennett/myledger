@@ -8,7 +8,7 @@ import cmd
 import hmac
 from importlib.metadata import files
 from fastapi import FastAPI, HTTPException, Request,UploadFile, File, Form
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
 
 from fastapi.staticfiles import StaticFiles
@@ -502,7 +502,6 @@ def update_status():
         "available": True
     }
 
-
 @app.post("/update")
 def update():
     try:
@@ -535,12 +534,24 @@ def journal(
     journals: str | None = None,
     account: str | None = None,
     match: str | None = None,
+    output: str | None = None,
    # begin: str | None = None,
    # end: str | None = None,
     query: str | None = None,
 ):
+    supported_outputs = {
+        "txt",
+        "html",
+        "csv",
+        "fods",
+        "sql",
+        "json",
+    }
+    if output is not None and output not in supported_outputs:
+        raise HTTPException(status_code=400, detail="Invalid output format")
+
     files = [str(JOURNAL_DIR / j) for j in journals.split(',')] if journals else [JOURNAL]
-    args = ["print", "--output-format=json"]
+    args = ["print", "-O", output] if output else ["print", "--output-format=json"]
 
     if account:
         args.append(account)
@@ -550,6 +561,21 @@ def journal(
         append_query_terms(args, query)
 
     out = hledger(args, files)
+    if output is not None:
+        media_types = {
+            "html": "text/html",
+            "csv": "text/csv",
+            "fods": "application/vnd.oasis.opendocument.spreadsheet-flat-xml",
+            "json": "application/json",
+        }
+        return Response(
+            out,
+            media_type=media_types.get(output, "text/plain"),
+            headers={
+                "Content-Disposition": f'attachment; filename="selected-journals.{output}"',
+            },
+        )
+
     txs = json.loads(out)
 
     results = []
@@ -558,12 +584,6 @@ def journal(
         date = tx["tdate"]
         desc = tx["tdescription"]
         postings = tx["tpostings"]
-
-        # Filtering
-        #if account and not any(p["paccount"] == account for p in postings):
-        #    continue
-        #if query and query.lower() not in desc.lower():
-        #    continue
 
         results.append({
             "date": date,

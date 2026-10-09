@@ -167,6 +167,19 @@ li {
   margin-bottom: 0.5rem;
 }
 
+#scroll-buttons {
+	display: flex;
+	justify-content: center;
+  color: var(--theme-navy);
+}
+
+#download {
+  text-align: center;
+  margin-top: 1rem;
+  font-style: italic;
+  color: var(--theme-muted-slate);
+}
+
 #main-view {
   flex: 1 1 0;
   min-width: 0;
@@ -510,7 +523,8 @@ section h2 {
 
 #journal-editor,
 #rules-editor,
-#rules-create-dialog {
+#rules-create-dialog,
+#journal-download-dialog {
   max-width: none;
   max-height: calc(100vh - 2rem);
   border: 1px solid var(--theme-border-strong);
@@ -529,6 +543,10 @@ section h2 {
   width: min(30rem, calc(100vw - 2rem));
 }
 
+#journal-download-dialog {
+  width: min(32rem, calc(100vw - 2rem));
+}
+
 #csv-uploader > div:first-of-type,
 .rules-file-controls,
 .journal-select-controls {
@@ -543,13 +561,15 @@ section h2 {
 
 #journal-editor::backdrop,
 #rules-editor::backdrop,
-#rules-create-dialog::backdrop {
+#rules-create-dialog::backdrop,
+#journal-download-dialog::backdrop {
   background: var(--theme-backdrop);
 }
 
 #journal-editor form,
 #rules-editor form,
-#rules-create-dialog form {
+#rules-create-dialog form,
+#journal-download-form {
   display: grid;
   gap: 0.75rem;
 }
@@ -586,6 +606,16 @@ section h2 {
   border: 1px solid var(--theme-border-strong);
   border-radius: 4px;
   background: var(--theme-surface);
+}
+
+#journal-download-format {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 4px;
+  background: var(--theme-surface);
+  color: var(--theme-navy);
+  font: inherit;
 }
 
 #journal-entry-content,
@@ -639,7 +669,8 @@ section h2 {
 @media (max-width: 600px) {
   #journal-editor,
   #rules-editor,
-  #rules-create-dialog {
+  #rules-create-dialog,
+  #journal-download-dialog {
     padding: 1rem;
   }
 

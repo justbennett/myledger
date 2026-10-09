@@ -26,7 +26,34 @@
       {% include '/components/charts.html' with context %}
       <!--Register Panel-->
       {% include '/components/register.html' with context %}
+      <div id="download">
+        <button type="button" id="download-journal" class="dark">Download Journal</button> Opens a file download dialog
+     </div>
 </section>
+
+<dialog id="journal-download-dialog" aria-labelledby="journal-download-title">
+  <form id="journal-download-form">
+    <div class="journal-editor-header">
+      <h2 id="journal-download-title">Download Selected Journals</h2>
+      {{ help_icon("https://hledger.org/1.51/hledger.html#output-format", "Select a format to download all the transactions currently listed") }}
+      <button type="button" class="icon-button" id="journal-download-cancel" aria-label="Cancel" title="Close">×</button>
+    </div>
+    <label for="journal-download-format">Output format</label>
+    <select id="journal-download-format" required>
+      <option value="txt">Plain text (.txt)</option>
+      <option value="html">HTML (.html)</option>
+      <option value="csv">CSV (.csv)</option>
+      <option value="fods">OpenSpreadsheet (.fods)</option>
+      <option value="sql">SQL (.sql)</option>
+      <option value="json">JSON (.json)</option>
+    </select>
+    <p>Select the desired output format to download all the transactions currently listed.</p>
+    <div class="journal-editor-actions">
+      <button type="button" class="dark" id="journal-download-cancel-button">Cancel</button>
+      <button type="submit" class="dark">Download</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="journal-editor" aria-labelledby="journal-editor-title">
     <form id="journal-editor-form">
@@ -41,7 +68,7 @@
         <label for="journal-destination">Journal</label>
         <select id="journal-destination" required></select>
       </div>
-      <label for="journal-entry-content">Transaction</label>
+      <label for="journal-entry-content">Remember two spaces must come after the account name before the ammount.</label>
       <textarea id="journal-entry-content" required spellcheck="false"></textarea>
       <p id="journal-editor-status" role="status" aria-live="polite"></p>
       <div class="journal-editor-actions">

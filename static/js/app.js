@@ -163,6 +163,52 @@ async function loadJournal(filters = {}) {
   }
 }
 
+document.getElementById("download-journal").addEventListener("click", () => {
+  document.getElementById("journal-download-dialog").showModal();
+});
+
+document.getElementById("journal-download-cancel").addEventListener("click", () => {
+  document.getElementById("journal-download-dialog").close();
+});
+
+document.getElementById("journal-download-cancel-button").addEventListener("click", () => {
+  document.getElementById("journal-download-dialog").close();
+});
+
+document.getElementById("journal-download-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const outputFormat = document.getElementById("journal-download-format").value;
+  document.getElementById("journal-download-dialog").close();
+  const params = new URLSearchParams({
+    journals: selectedJournals.join(","),
+    output: outputFormat,
+  });
+  if (currentAccountFilter) params.set("account", currentAccountFilter);
+  const searchQuery = document.getElementById("journal-search").value.trim();
+  if (searchQuery) params.set("query", searchQuery);
+
+  try {
+    const response = await fetch(`/journal?${params.toString()}`);
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(detail || `HTTP ${response.status}`);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.createElement("a");
+    downloadLink.href = url;
+    downloadLink.download = `selected-journals.${outputFormat}`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    console.error("Journal download failed:", error);
+    window.alert(`Journal download failed: ${error.message}`);
+  }
+});
+
 
 //Make a function to render account names with a filter icon next to them
 /*****************Rendering Functions************** */
