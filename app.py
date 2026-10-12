@@ -78,6 +78,22 @@ def append_query_terms(args, query):
     except ValueError as error:
         raise HTTPException(status_code=400, detail=f"Invalid query quoting: {error}")
 
+def append_account_and_query(args, account, query):
+    if account and query:
+        try:
+            shlex.split(query)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=f"Invalid query quoting: {error}")
+
+        quoted_account = account.replace("'", "''")
+        args.append(f"expr:acct:'{quoted_account}' AND ({query})")
+        return
+
+    if account:
+        args.append(account)
+    if query:
+        append_query_terms(args, query)
+
 def build_register_transactions(rows, account_filter=None):
     grouped = group_register_rows(rows)
     transactions = []
@@ -264,7 +280,7 @@ def resolve_data_file(directory, filename):
     return file_path
 
 # API Endpoints ***************************
-@app.get("/balance")
+@app.get("/balance", summary="Get the balance of the ledger")
 def balance(
     journals: str | None = None,
     begin: str | None = None,
@@ -305,7 +321,7 @@ def balance(
     tree = parse_hledger_rows(rows[0])  # the outermost array
     return tree
 
-@app.get("/journals")
+@app.get("/journals", summary="List all journal files")
 def list_journals():
     import os
     journals_dir = JOURNAL_DIR
@@ -314,7 +330,7 @@ def list_journals():
         return {"journals": files}
     return {"journals": []}
 
-@app.post("/journals")
+@app.post("/journals", summary="Create a new journal file")
 async def create_journal_file(request: Request):
     data = await request.json()
     requested_name = data.get("filename") if isinstance(data, dict) else None
@@ -348,13 +364,13 @@ async def create_journal_file(request: Request):
 
     return {"filename": filename}
 
-@app.get("/journal-files/{filename}", response_class=PlainTextResponse)
+@app.get("/journal-files/{filename}", response_class=PlainTextResponse, summary="Read a journal file")
 def read_journal_file(filename: str):
     if Path(filename).suffix.lower() != ".journal":
         raise HTTPException(status_code=404, detail="File not found")
     return resolve_data_file(JOURNAL_DIR, filename).read_text(encoding="utf-8")
 
-@app.put("/journal-files/{filename}")
+@app.put("/journal-files/{filename}", summary="Update a journal file")
 async def update_journal_file(filename: str, request: Request):
     if Path(filename).suffix.lower() != ".journal":
         raise HTTPException(status_code=404, detail="File not found")
@@ -390,7 +406,7 @@ async def update_journal_file(filename: str, request: Request):
 
     return {"success": True}
 
-@app.get("/register")
+@app.get("/register", summary="Return register transactions")
 def register(
     journals: str | None = None,
     account: str | None = None,
@@ -401,14 +417,11 @@ def register(
     files = [str(JOURNAL_DIR / j) for j in journals.split(',')] if journals else [JOURNAL]
     args = ["register", "-O", "json"]
 
-    if account:
-        args.append(account)
     if begin:
         args += ["--begin", begin]
     if end:
         args += ["--end", end]
-    if query:
-        append_query_terms(args, query)
+    append_account_and_query(args, account, query)
 
     raw = hledger(args, files)  # get raw JSON output
     rows = json.loads(raw) # parse JSON
@@ -417,21 +430,21 @@ def register(
 
     return transactionsOut
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse, summary="Dashboard page")
 def dashboard(request: Request):
     return templates.TemplateResponse(
         request,
         "dashboard.html"
     )
 
-@app.get("/login", response_class=HTMLResponse)
+@app.get("/login", response_class=HTMLResponse, summary="Login page")
 def login_page(request: Request):
     return templates.TemplateResponse(
         request,
         "login.html"
     )
 
-@app.post("/login")
+@app.post("/login", summary="Handle login")
 def login(
     request: Request,
     username: str = Form(...),
@@ -471,12 +484,12 @@ def login(
 
     return RedirectResponse("/", status_code=303)
 
-@app.get("/logout")
+@app.get("/logout", summary="Handle logout")
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
 
-@app.get("/update-status")
+@app.get("/update-status", summary="Check for updates")
 def update_status():
 
     deploy_script = "/usr/local/bin/myledger-deploy"
@@ -521,7 +534,7 @@ def update_status():
         "available": True
     }
 
-@app.post("/update")
+@app.post("/update", summary="Trigger an update")
 def update():
     try:
         subprocess.Popen(
@@ -541,14 +554,14 @@ def update():
         "message": "Update started. MyLedger will restart automatically.",
     }
 
-@app.get("/move-data", response_class=HTMLResponse)
+@app.get("/move-data", response_class=HTMLResponse, summary="Move data page")
 def add_data(request: Request):
     return templates.TemplateResponse(
         request,
         "move-data.html"
     )
 
-@app.get("/journal")
+@app.get("/journal", summary="Get journal transactions")
 def journal(
     journals: str | None = None,
     account: str | None = None,
@@ -572,12 +585,9 @@ def journal(
     files = [str(JOURNAL_DIR / j) for j in journals.split(',')] if journals else [JOURNAL]
     args = ["print", "-O", output] if output else ["print", "--output-format=json"]
 
-    if account:
-        args.append(account)
     if match:
         args += ["-m ", match]
-    if query:
-        append_query_terms(args, query)
+    append_account_and_query(args, account, query)
 
     out = hledger(args, files)
     if output is not None:
@@ -633,7 +643,7 @@ def journal(
 
     return results
 
-@app.post("/journal/edit")
+@app.post("/journal/edit", summary="Edit a journal transaction")
 async def edit_journal_entry(request: Request):
     data = await request.json()
     journal_name = data.get("journal")
@@ -699,7 +709,7 @@ async def edit_journal_entry(request: Request):
 
     return {"success": True}
 
-@app.post("/journal/add")
+@app.post("/journal/add", summary="Add a journal transaction")
 async def add_journal_entry(request: Request):
     data = await request.json()
     journal_name = data.get("journal") if isinstance(data, dict) else None
@@ -732,14 +742,14 @@ async def add_journal_entry(request: Request):
 
     return {"success": True, "journal": journal_name}
 
-@app.get("/get-rules")
+@app.get("/get-rules", summary="Get the list of rules files")
 def get_rules():
     if RULES_DIR.exists():
         files = [path.name for path in RULES_DIR.iterdir() if path.is_file() and not path.name.startswith('.')]
         return {"rules": files}
     return {"rules": []}
 
-@app.post("/rules")
+@app.post("/rules", summary="Create a new rules file")
 async def create_rule_file(request: Request):
     data = await request.json()
     requested_name = data.get("filename") if isinstance(data, dict) else None
@@ -773,11 +783,11 @@ async def create_rule_file(request: Request):
 
     return {"filename": filename}
 
-@app.get("/rules/{filename}", response_class=PlainTextResponse)
+@app.get("/rules/{filename}", response_class=PlainTextResponse, summary="Read a rules file")
 def read_rule_file(filename: str):
     return resolve_data_file(RULES_DIR, filename).read_text(encoding="utf-8")
 
-@app.put("/rules/{filename}")
+@app.put("/rules/{filename}", summary="Update a rules file")
 async def update_rule_file(filename: str, request: Request):
     if Path(filename).suffix.lower() != ".rules":
         raise HTTPException(status_code=404, detail="File not found")
@@ -813,18 +823,18 @@ async def update_rule_file(filename: str, request: Request):
 
     return {"success": True}
 
-@app.get("/get-data-files")
+@app.get("/get-data-files", summary="Get the list of data files")
 def get_data_files():
     if DATA_DIR.exists():
         files = [path.name for path in DATA_DIR.iterdir() if path.is_file() and not path.name.startswith('.')]
         return {"data-files": files}
     return {"data-files": []}
 
-@app.get("/data-files/{filename}", response_class=PlainTextResponse)
+@app.get("/data-files/{filename}", response_class=PlainTextResponse, summary="Read a data file")
 def read_data_file(filename: str):
     return resolve_data_file(DATA_DIR, filename).read_text(encoding="utf-8")
 
-@app.post("/upload-data")
+@app.post("/upload-data", summary="Upload a data file")
 async def upload_data(file: UploadFile = File(...)):
     filename = file.filename
     if (
@@ -853,7 +863,7 @@ async def upload_data(file: UploadFile = File(...)):
 
     return {"success": True, "file": filename}
 
-@app.post("/import")
+@app.post("/import", summary="Import data into a journal")
 async def import_data(
     file: str = Form(...),
     rule: str = Form(...),
