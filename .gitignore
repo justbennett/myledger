@@ -14,3 +14,5 @@ __pycache__/
 /myledger-data/
 *.code-workspace
 process.md
+
+report.*

@@ -172,7 +172,7 @@ My production instance runs on a Linux VM under Proxmox. This could also be run 
 Application directory:
 
 ```text
-/home/justbennett/myledger
+/home/<usr_directory>/myledger
 ```
 
 The application runs under Uvicorn and is managed by systemd.
