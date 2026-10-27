@@ -12,7 +12,7 @@ __pycache__/
 /register.json
 /*.csv
 /myledger-data/
-*.code-workspace
+myledger-github.code-workspace
 process.md
 
 report.*

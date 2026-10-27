@@ -17,6 +17,10 @@
         <h1>MyLedger</h1>
     </header>
     
+    {% if session_expired %}
+    <p role="alert">Your session has expired. Please log in again.</p>
+    {% endif %}
+
     {% if error %}
     <p>{{ error }}</p>
     {% endif %}

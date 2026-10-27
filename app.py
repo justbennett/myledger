@@ -8,7 +8,7 @@ import cmd
 import hmac
 from importlib.metadata import files
 from fastapi import FastAPI, HTTPException, Request,UploadFile, File, Form
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from starlette.middleware.sessions import SessionMiddleware
 
 from fastapi.staticfiles import StaticFiles
@@ -41,6 +41,12 @@ async def require_login(request: Request, call_next):
         return await call_next(request)
 
     if not request.session.get("authenticated"):
+        if request.headers.get("x-myledger-request") == "fetch":
+            return JSONResponse(
+                {"detail": "Your session has expired. Please log in again."},
+                status_code=401,
+                headers={"X-Session-Expired": "true"},
+            )
         return RedirectResponse("/login", status_code=303)
 
     return await call_next(request)
@@ -441,7 +447,8 @@ def dashboard(request: Request):
 def login_page(request: Request):
     return templates.TemplateResponse(
         request,
-        "login.html"
+        "login.html",
+        {"session_expired": request.query_params.get("expired") == "1"},
     )
 
 @app.post("/login", summary="Handle login")
