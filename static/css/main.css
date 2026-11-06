@@ -448,10 +448,31 @@ main.move-data-main {
   margin-top: 1.5rem;
 }
 
-.report-grid {
+.report-top-row {
+  display: flex;
+  align-items: flex-start;
+}
+
+.report-type-field {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.report-type-field label {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
+  gap: 0.35rem;
+  min-width: 12.5rem;
+}
+
+.report-type-help {
+  color: var(--theme-muted-slate);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  max-width: 22rem;
+  min-height: 2rem;
+  padding-bottom: 0.2rem;
 }
 
 .reports-form label {
@@ -476,16 +497,119 @@ main.move-data-main {
   color: var(--theme-navy);
 }
 
+.report-controls-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.report-date-section,
+.report-filter-section,
+.report-options-section {
+  display: grid;
+  gap: 0.25rem;
+  width: fit-content;
+  padding-top: 0.25rem;
+}
+
+.report-date-stack,
+.report-filter-stack,
+.report-checkbox-group {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  background: var(--theme-light-slate);
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.report-date-stack,
+.report-filter-stack,
+.report-checkbox-group {
+  min-width: 12.5rem;
+}
+
+.report-date-stack label,
+.report-filter-stack label,
+.report-extra-label {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 12.5rem;
+}
+
+.report-filter-stack {
+  min-width: 17rem;
+}
+
+.report-options-with-extra {
+  width: fit-content;
+}
+
+.report-checkbox-group {
+  min-width: 19rem;
+}
+
+.report-extra-box {
+  border-top: 1px solid var(--theme-border);
+  padding-top: 0.5rem;
+  margin-top: 0.2rem;
+}
+
+.report-extra-box input {
+  width: 100%;
+  min-width: 0;
+}
+
+.report-options-header {
+  color: var(--theme-muted-slate);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .checkbox-field {
   display: flex !important;
-  align-items: center;
-  gap: 0.5rem;
-  padding-top: 1.7rem;
+  align-items: flex-start;
+  gap: 0.45rem;
+  min-height: 1.5rem;
+  margin: 0;
+  color: var(--theme-navy);
 }
 
 .checkbox-field input {
-  width: 1rem;
-  height: 1rem;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.checkbox-field.is-disabled {
+  color: var(--theme-muted-slate);
+  opacity: 0.65;
+}
+
+.checkbox-field.is-disabled input {
+  cursor: not-allowed;
+}
+
+.checkbox-copy {
+  display: grid;
+  gap: 0.06rem;
+  line-height: 1.2;
+}
+
+.checkbox-label {
+  font-weight: 600;
+}
+
+.checkbox-copy small {
+  color: inherit;
+  font-size: 0.72rem;
+  line-height: 1.3;
 }
 
 .full-width {
@@ -496,7 +620,8 @@ main.move-data-main {
   display: flex;
   align-items: center;
   gap: 1rem;
-  margin-top: 0.5rem;
+  margin-top: 1rem;
+  justify-content: flex-start;
 }
 
 button.dark,
@@ -504,10 +629,13 @@ button.dark,
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 2.75rem;
   padding: 0.7rem 1.1rem;
   border-radius: 4px;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 button.dark {

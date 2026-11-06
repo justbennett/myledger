@@ -21,84 +21,123 @@
 
   <main class="reports-main">
     <section class="reports-panel">
-      <h2>Custom hledger report builder</h2>
-      <p class="report-subtitle">Generate plain-text hledger output for balances, registers, cashflow and other reports.{{ help_icon("https://hledger.org/1.52/hledger.html#standard-report-commands", "hledger manual") }}</p>
+      <h2>Custom hledger Report Builder</h2>
+      <p class="report-subtitle">Generate plain-text hledger output for balances,
+         registers, cashflow and other reports. The hledger command will be displayed below.
+         Charts will be available for some reports.{{ help_icon("https://hledger.org/1.52/hledger.html#standard-report-commands", "hledger manual") }}</p>
 
-      <form method="post" action="/reports" class="reports-form">
-        <div class="report-grid">
-          <label>
-            Report type
-            <select name="report_type">
-              {% for report_type in report_types %}
-                <option value="{{ report_type }}" {% if report_form.report_type == report_type %}selected{% endif %}>{{ report_type }}</option>
-              {% endfor %}
-            </select>
-          </label>
-
-          <label>
-            Begin date
-            <input type="date" name="begin" value="{{ report_form.begin }}">
-          </label>
-
-          <label>
-            End date
-            <input type="date" name="end" value="{{ report_form.end }}">
-          </label>
-
-          <label>
-            Account filter
-            <input type="text" name="account" value="{{ report_form.account }}" placeholder="assets:cash or liabilities:credit-card">
-          </label>
-
-          <label>
-            Query / filter
-            <input type="text" name="query" value="{{ report_form.query }}" placeholder="food or acct:assets and not cash">
-          </label>
-
-          <label>
-            Depth
-            <input type="number" name="depth" min="1" step="1" value="{{ report_form.depth }}" placeholder="Optional">
-          </label>
-
-          <label>
-            Period
-            <select name="period">
-              <option value="" {% if not report_form.period %}selected{% endif %}>Default</option>
-              <option value="daily" {% if report_form.period == "daily" %}selected{% endif %}>Daily</option>
-              <option value="weekly" {% if report_form.period == "weekly" %}selected{% endif %}>Weekly</option>
-              <option value="monthly" {% if report_form.period == "monthly" %}selected{% endif %}>Monthly</option>
-              <option value="quarterly" {% if report_form.period == "quarterly" %}selected{% endif %}>Quarterly</option>
-              <option value="yearly" {% if report_form.period == "yearly" %}selected{% endif %}>Yearly</option>
-            </select>
-          </label>
-
-          <label class="checkbox-field">
-            <input type="checkbox" name="tree" {% if report_form.tree %}checked{% endif %}>
-            Tree view
-          </label>
-
-          <label class="checkbox-field">
-            <input type="checkbox" name="empty" {% if report_form.empty %}checked{% endif %}>
-            Include empty accounts
-          </label>
+      <form method="post" action="/reports" class="reports-form" id="report-form">
+        <div class="report-top-row">
+          <div class="report-type-field">
+            <label>
+              Report type
+              <select name="report_type">
+                {% for report_type in report_types %}
+                  <option value="{{ report_type }}" {% if report_form.report_type == report_type %}selected{% endif %}>{{ report_type }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div id="report-type-help" class="report-type-help"></div>
+          </div>
         </div>
 
-        <p class="full-width">
-          Extra hledger arguments{{ help_icon("https://hledger.org/1.51/hledger.html", "hledger manual") }}</p>
-          <input type="text" name="extra_args" value="{{ report_form.extra_args }}" placeholder="--sort-amount or --format csv">
+        <div class="report-controls-row">
+          <div class="report-date-section">
+            <div class="report-options-header">Dates</div>
+            <div class="report-date-stack">
+              <label>
+                Begin date
+                <input type="date" name="begin" value="{{ report_form.begin }}">
+              </label>
 
-        <div class="form-actions">
-          <button type="submit" class="dark">Submit command</button>
-          <a href="/reports" class="secondary-link">Reset</a>
+              <label>
+                End date
+                <input type="date" name="end" value="{{ report_form.end }}">
+              </label>
+
+              <label>
+                Reporting interval
+                <select name="period">
+                  <option value="" {% if not report_form.period %}selected{% endif %}>None</option>
+                  <option value="daily" {% if report_form.period == "daily" %}selected{% endif %}>Daily</option>
+                  <option value="weekly" {% if report_form.period == "weekly" %}selected{% endif %}>Weekly</option>
+                  <option value="monthly" {% if report_form.period == "monthly" %}selected{% endif %}>Monthly</option>
+                  <option value="quarterly" {% if report_form.period == "quarterly" %}selected{% endif %}>Quarterly</option>
+                  <option value="yearly" {% if report_form.period == "yearly" %}selected{% endif %}>Yearly</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <div class="report-filter-section">
+            <div class="report-options-header">Filters</div>
+            <div class="report-filter-stack">
+              <label>
+                Account filter
+                <input type="text" name="account" value="{{ report_form.account }}" placeholder="assets:cash or liabilities:credit-card">
+              </label>
+
+              <label>
+                Query / filter
+                <input type="text" name="query" value="{{ report_form.query }}" placeholder="food or acct:assets and not cash">
+              </label>
+
+              <label>
+                Depth
+                <input type="number" name="depth" min="1" step="1" value="{{ report_form.depth }}" placeholder="Optional">
+              </label>
+            </div>
+          </div>
+
+          <div class="report-options-section report-options-with-extra">
+            <div class="report-options-header">Available Options</div>
+            <div class="report-checkbox-group">
+              <label class="checkbox-field report-option-historical">
+                <input type="checkbox" name="historical" {% if report_form.historical %}checked{% endif %}>
+                <span class="checkbox-copy">
+                  <span class="checkbox-label">Historical</span>
+                  <small>Include prior balances from before the selected date range.</small>
+                </span>
+              </label>
+
+              <label class="checkbox-field report-option-tree">
+                <input type="checkbox" name="tree" {% if report_form.tree %}checked{% endif %}>
+                <span class="checkbox-copy">
+                  <span class="checkbox-label">Tree view</span>
+                  <small>Group account totals into a nested hierarchy.</small>
+                </span>
+              </label>
+
+              <label class="checkbox-field">
+                <input type="checkbox" name="empty" {% if report_form.empty %}checked{% endif %}>
+                <span class="checkbox-copy">
+                  <span class="checkbox-label">Include empty accounts</span>
+                  <small>Show accounts with zero balances as well as populated ones.</small>
+                </span>
+              </label>
+
+              <div class="report-extra-box">
+                <label class="report-extra-label">
+                  Extra hledger arguments
+                  <input type="text" name="extra_args" value="{{ report_form.extra_args }}" placeholder="--sort-amount or --format csv">
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
       </form>
 
       {% if report_command %}
         <div class="report-command">
-          <h3>hledger command</h3>
-          <textarea id="report-command-input" rows="4" spellcheck="false" readonly aria-readonly="true" aria-label="hledger command preview">{{ report_command }}</textarea>
+          <h3>hledger Command Preview</h3>
+          <pre id="report-command-input" rows="4" spellcheck="false" readonly aria-readonly="true" aria-label="hledger command preview">{{ report_command }}</pre>
         </div>
       {% endif %}
+
+      <div class="form-actions">
+        <button type="submit" form="report-form" class="dark">Submit command</button>
+        <a href="/reports" class="secondary-link">Reset</a>
+      </div>
 
       <div class="journal-view-tabs" role="tablist" aria-label="Reports views">
         <button type="button" id="report-view-tab" class="journal-view-tab active" data-tab="report" role="tab" aria-selected="true" aria-controls="reports-tab-report" tabindex="0">Report</button>
@@ -350,6 +389,8 @@
         const query = document.querySelector('input[name="query"]').value;
         const depth = document.querySelector('input[name="depth"]').value;
         const period = document.querySelector('select[name="period"]').value;
+        const historicalCheckbox = document.querySelector('input[name="historical"]');
+        const historical = historicalCheckbox ? historicalCheckbox.checked : false;
         const tree = document.querySelector('input[name="tree"]').checked ? 'true' : 'false';
         const empty = document.querySelector('input[name="empty"]').checked ? 'true' : 'false';
         const extraArgs = document.querySelector('input[name="extra_args"]').value;
@@ -362,6 +403,7 @@
           query,
           depth,
           period,
+          historical: historical ? 'true' : 'false',
           tree,
           empty,
           extra_args: extraArgs,
@@ -417,9 +459,66 @@
         });
       };
 
+      const setCommandPreview = (content) => {
+        if (!reportCommandInput) {
+          return;
+        }
+        if ("value" in reportCommandInput) {
+          reportCommandInput.value = content;
+        } else {
+          reportCommandInput.textContent = content;
+        }
+      };
+
+      const reportTypeHelp = {
+        balance: "Shows balances and account totals for the selected time range.",
+        register: "Lists postings in transaction register format with lots of detail.",
+        cashflow: "Summarizes inflows and outflows over time by account or category.",
+        print: "Prints the raw journal entries or account data in a readable form.",
+        accounts: "Lists all accounts and their hierarchical structure.",
+      };
+
+      const updateConditionalOptions = () => {
+        if (!reportForm) return;
+        const reportType = document.querySelector('select[name="report_type"]').value || "balance";
+        const historicalField = document.querySelector('.report-option-historical');
+        const treeField = document.querySelector('.report-option-tree');
+        const historicalInput = historicalField ? historicalField.querySelector('input[name="historical"]') : null;
+        const treeInput = treeField ? treeField.querySelector('input[name="tree"]') : null;
+        const typeHelpNode = document.getElementById('report-type-help');
+
+        if (typeHelpNode) {
+          typeHelpNode.textContent = reportTypeHelp[reportType] || "Choose a report type to see more detail here.";
+        }
+
+        if (historicalField) {
+          const available = reportType === "balance";
+          historicalField.classList.toggle('is-disabled', !available);
+          if (historicalInput) {
+            historicalInput.disabled = !available;
+            historicalInput.setAttribute('aria-disabled', String(!available));
+            if (!available) {
+              historicalInput.checked = false;
+            }
+          }
+        }
+
+        if (treeField) {
+          const available = !["print", "register"].includes(reportType);
+          treeField.classList.toggle('is-disabled', !available);
+          if (treeInput) {
+            treeInput.disabled = !available;
+            treeInput.setAttribute('aria-disabled', String(!available));
+            if (!available) {
+              treeInput.checked = false;
+            }
+          }
+        }
+      };
+
       const buildCommandPreview = () => {
         if (!reportForm) {
-          return reportCommandInput ? reportCommandInput.value : "";
+          return reportCommandInput && "value" in reportCommandInput ? reportCommandInput.value : (reportCommandInput ? reportCommandInput.textContent : "");
         }
 
         const reportType = document.querySelector('select[name="report_type"]').value || "balance";
@@ -429,13 +528,16 @@
         const query = document.querySelector('input[name="query"]').value;
         const depth = document.querySelector('input[name="depth"]').value;
         const period = document.querySelector('select[name="period"]').value;
+        const historicalCheckbox = document.querySelector('input[name="historical"]');
+        const historical = historicalCheckbox ? historicalCheckbox.checked : false;
         const tree = document.querySelector('input[name="tree"]').checked;
         const empty = document.querySelector('input[name="empty"]').checked;
         const extraArgs = document.querySelector('input[name="extra_args"]').value;
         const extraTokens = splitExtraArgs(extraArgs);
+        const hasHistoricalFlag = extraTokens.some((token) => token === "-H" || token === "--historical");
 
         const commandArgs = ["hledger", reportType];
-        if (reportType === "balance" && !extraTokens.some((token) => token === "-H" || token === "--historical")) {
+        if (reportType === "balance" && historical && !hasHistoricalFlag) {
           commandArgs.push("--historical");
         }
         if (begin) commandArgs.push("--begin", begin);
@@ -453,7 +555,8 @@
 
       if (reportForm && reportCommandInput) {
         const syncCommandPreview = () => {
-          reportCommandInput.value = buildCommandPreview();
+          updateConditionalOptions();
+          setCommandPreview(buildCommandPreview());
         };
 
         reportForm.addEventListener("input", () => {
@@ -464,6 +567,7 @@
           syncCommandPreview();
           syncChartControls();
         });
+        document.querySelector('select[name="report_type"]').addEventListener("change", syncCommandPreview);
         syncCommandPreview();
       }
 

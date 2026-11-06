@@ -339,6 +339,7 @@ def parse_common_hledger_filters(form_data):
         "query": (form_data.get("query") or "").strip(),
         "depth": (form_data.get("depth") or "").strip(),
         "period": (form_data.get("period") or "").strip().lower(),
+        "historical": parse_checkbox_value(form_data.get("historical"), default=False),
         "tree": parse_checkbox_value(form_data.get("tree"), default=False),
         "empty": parse_checkbox_value(form_data.get("empty"), default=False),
         "extra_args": (form_data.get("extra_args") or "").strip(),
@@ -394,16 +395,18 @@ def build_hledger_report_args(form_data):
 
     filters = parse_common_hledger_filters(form_data)
     extra_tokens = parse_extra_hledger_args(filters.get("extra_args"))
+    historical = bool(filters.get("historical", False))
+    include_tree = report_type in {"balance", "cashflow", "accounts"}
 
     args = [report_type]
-    if report_type == "balance" and not has_hledger_flag(extra_tokens, "-H", "--historical"):
+    if report_type == "balance" and historical and not has_hledger_flag(extra_tokens, "-H", "--historical"):
         args.append("--historical")
 
     apply_common_hledger_filters(
         args,
         filters,
         include_account_query=True,
-        include_tree=True,
+        include_tree=include_tree,
         include_empty=True,
         include_extra_args=True,
     )
@@ -446,15 +449,17 @@ def build_hledger_chart_payload(form_data, chart_type):
         raise HTTPException(status_code=400, detail="Pie charts require a date range without a period")
 
     extra_tokens = parse_extra_hledger_args(filters.get("extra_args"))
+    historical = bool(filters.get("historical", False))
+    include_tree = report_type in {"balance", "cashflow", "accounts"}
     args = [report_type]
-    if report_type == "balance" and not has_hledger_flag(extra_tokens, "-H", "--historical"):
+    if report_type == "balance" and historical and not has_hledger_flag(extra_tokens, "-H", "--historical"):
         args.append("--historical")
 
     apply_common_hledger_filters(
         args,
         filters,
         include_account_query=True,
-        include_tree=True,
+        include_tree=include_tree,
         include_empty=True,
         include_extra_args=True,
     )
@@ -514,14 +519,16 @@ def build_hledger_command(args, files=None):
 
 @app.get("/reports", response_class=HTMLResponse, summary="Reports page")
 def reports(request: Request):
+    today = datetime.today()
     default_form = {
         "report_type": "balance",
-        "begin": "",
-        "end": "",
+        "begin": today.replace(month=1, day=1).date().isoformat(),
+        "end": today.date().isoformat(),
         "account": "",
         "query": "",
         "depth": "",
         "period": "",
+        "historical": True,
         "tree": True,
         "empty": True,
         "extra_args": "",
@@ -549,6 +556,7 @@ def chart_report(
     query: str | None = None,
     depth: str | None = None,
     period: str | None = None,
+    historical: str | None = None,
     tree: str | None = None,
     empty: str | None = None,
     extra_args: str | None = None,
@@ -563,6 +571,7 @@ def chart_report(
             "query": query,
             "depth": depth,
             "period": period,
+            "historical": historical,
             "tree": tree,
             "empty": empty,
             "extra_args": extra_args,
@@ -580,6 +589,7 @@ def download_report(
     query: str | None = None,
     depth: str | None = None,
     period: str | None = None,
+    historical: str | None = None,
     tree: str | None = None,
     empty: str | None = None,
     extra_args: str | None = None,
@@ -605,6 +615,7 @@ def download_report(
             "query": query,
             "depth": depth,
             "period": period,
+            "historical": historical,
             "tree": tree,
             "empty": empty,
             "extra_args": extra_args,
