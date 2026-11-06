@@ -419,6 +419,276 @@ main.move-data-main {
   width: 100%;
 }
 
+.reports-main {
+  display: block;
+}
+
+.reports-panel {
+  width: min(100%, 1100px);
+  margin: 0 auto;
+}
+
+.report-subtitle {
+  color: var(--theme-muted-slate);
+  margin-top: 0.25rem;
+}
+
+.reports-tab-panel {
+  display: block;
+}
+
+.reports-tab-panel[hidden],
+[hidden] {
+  display: none !important;
+}
+
+.reports-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.reports-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--theme-muted-slate);
+  font-size: 0.9rem;
+}
+
+.reports-form input,
+.reports-form select,
+.reports-form button {
+  font: inherit;
+}
+
+.reports-form input,
+.reports-form select {
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 4px;
+  background: var(--theme-surface);
+  color: var(--theme-navy);
+}
+
+.checkbox-field {
+  display: flex !important;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 1.7rem;
+}
+
+.checkbox-field input {
+  width: 1rem;
+  height: 1rem;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+button.dark,
+.secondary-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.1rem;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.dark {
+  border: none;
+  background: var(--theme-navy);
+  color: var(--theme-surface);
+}
+
+.secondary-link {
+  color: var(--theme-navy);
+  text-decoration: none;
+  border: 1px solid var(--theme-border-strong);
+  background: var(--theme-surface);
+}
+
+.report-command,
+.report-error,
+.report-output {
+  margin-top: 1.5rem;
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  background: var(--theme-light-slate);
+  padding: 1rem;
+}
+
+.report-command textarea,
+.report-error pre,
+.report-output pre {
+  margin: 0.75rem 0 0;
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+  padding: 0.75rem;
+  min-height: 4.5rem;
+}
+
+.report-command textarea {
+  width: 100%;
+  min-height: 5.75rem;
+  resize: none;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 4px;
+  background: var(--theme-surface);
+  color: var(--theme-navy);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: hidden;
+  cursor: default;
+}
+
+.report-chart-panel {
+  margin-top: 1.5rem;
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  background: var(--theme-light-slate);
+  padding: 1rem;
+}
+
+.report-chart-controls {
+  display: flex;
+  align-items: end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0 1rem;
+}
+
+.report-chart-controls label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--theme-muted-slate);
+  font-size: 0.9rem;
+}
+
+.report-chart-controls select {
+  min-width: 9rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 4px;
+  background: var(--theme-surface);
+  color: var(--theme-navy);
+}
+
+.report-chart-area {
+  width: 100%;
+  overflow-x: auto;
+  padding-top: 0.5rem;
+}
+
+.report-chart-svg {
+  width: 100%;
+  min-height: 280px;
+  height: auto;
+  display: block;
+  background: var(--theme-surface);
+  border: 1px solid var(--theme-border);
+  border-radius: 4px;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--theme-muted-slate);
+}
+
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-swatch {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 3px;
+}
+
+.chart-empty {
+  margin: 0;
+  color: var(--theme-muted-slate);
+}
+
+.report-output pre {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.report-output-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.report-output-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.small-button {
+  padding: 0.5rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.report-output.is-full-window {
+  position: fixed;
+  inset: 1rem 1rem 1rem 1rem;
+  z-index: 1000;
+  background: var(--theme-surface);
+  padding: 1rem;
+  border: 1px solid var(--theme-border-strong);
+  border-radius: 8px;
+  box-shadow: 0 20px 40px var(--theme-backdrop);
+  display: flex;
+  flex-direction: column;
+}
+
+.report-output.is-full-window pre {
+  max-height: none;
+  height: calc(100vh - 8rem);
+  flex: 1 1 auto;
+}
+
+.report-command h3,
+.report-error strong,
+.report-output h3 {
+  margin: 0;
+}
+
 #upload-flow-container > div {
   flex: 0 1 22rem;
   min-width: min(100%, 18rem);
@@ -525,7 +795,8 @@ section h2 {
 #rules-editor,
 #rules-create-dialog,
 #journal-download-dialog,
-#balance-download-dialog {
+#balance-download-dialog,
+#report-download-dialog {
   max-width: none;
   max-height: calc(100vh - 2rem);
   border: 1px solid var(--theme-border-strong);
@@ -544,11 +815,9 @@ section h2 {
   width: min(30rem, calc(100vw - 2rem));
 }
 
-#journal-download-dialog {
-  width: min(32rem, calc(100vw - 2rem));
-}
-
-#balance-download-dialog {
+#journal-download-dialog,
+#balance-download-dialog,
+#report-download-dialog {
   width: min(32rem, calc(100vw - 2rem));
 }
 
@@ -568,7 +837,8 @@ section h2 {
 #rules-editor::backdrop,
 #rules-create-dialog::backdrop,
 #journal-download-dialog::backdrop,
-#balance-download-dialog::backdrop {
+#balance-download-dialog::backdrop,
+#report-download-dialog::backdrop {
   background: var(--theme-backdrop);
 }
 
@@ -576,7 +846,8 @@ section h2 {
 #rules-editor form,
 #rules-create-dialog form,
 #journal-download-form,
-#balance-download-form {
+#balance-download-form,
+#report-download-form {
   display: grid;
   gap: 0.75rem;
 }

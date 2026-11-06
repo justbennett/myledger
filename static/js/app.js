@@ -12,6 +12,67 @@ let journalChart = null;
 
 let debugMode = false; //set to true to enable debug logging
 
+const journalDataService = {
+  buildQueryParams(filters = {}) {
+    const params = new URLSearchParams({ journals: selectedJournals.join(',') });
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== "") {
+        params.set(key, String(value));
+      }
+    });
+    return params;
+  },
+
+  async fetchJournals() {
+    const response = await fetch("/journals");
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  },
+
+  async fetchBalance() {
+    const params = this.buildQueryParams();
+    const response = await fetch(`/balance?${params.toString()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  },
+
+  async fetchRegister({ account = null, query = currentJournalSearch } = {}) {
+    const params = this.buildQueryParams({ account: account || undefined, query: query || undefined });
+    const response = await fetch(`/register?${params.toString()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  },
+
+  async fetchJournal(filters = {}) {
+    const params = this.buildQueryParams(filters);
+    const response = await fetch(`/journal?${params.toString()}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  },
+};
+
+const journalCharting = {
+  amountsForClass(transactions) {
+    const accountClass = document.getElementById("chart-account-class").value.toLowerCase();
+    const amounts = [];
+    for (const transaction of transactions) {
+      for (const posting of transaction.postings) {
+        const account = posting.account || "";
+        if (account.split(":", 1)[0].toLowerCase() !== accountClass) continue;
+        for (const amount of posting.amount) {
+          amounts.push({
+            date: transaction.date,
+            account,
+            commodity: amount.commodity || "(no commodity)",
+            quantity: Number(amount.quantity),
+          });
+        }
+      }
+    }
+    return amounts.filter((amount) => Number.isFinite(amount.quantity));
+  },
+};
+
 
   // Toggle visibility
   const toggle = document.getElementById('journal-toggle');
@@ -66,9 +127,7 @@ function updateIncludedJournals() {
 async function loadJournals() {
   
   try {
-    const res = await fetch("/journals");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
+    const data = await journalDataService.fetchJournals();
     const select = document.getElementById('journal-select');
     select.innerHTML = '';
     data.journals.forEach(j => {
@@ -111,9 +170,7 @@ async function loadJournals() {
 
 /*****************Data Loading Functions************** */
 async function loadBalance() {
-  const res = await fetch(`/balance?journals=${selectedJournals.join(',')}`);
-
-  const data = await res.json();
+  const data = await journalDataService.fetchBalance();
 
   const container = document.getElementById("accounts");
   container.innerHTML = "";
@@ -172,12 +229,7 @@ document.getElementById("balance-download-form").addEventListener("submit", asyn
 });
 
 async function loadRegister(account = null, query = currentJournalSearch) {
-  const params = new URLSearchParams({ journals: selectedJournals.join(',') });
-  if (account) params.set("account", account);
-  if (query) params.set("query", query);
-  const url = `/register?${params.toString()}`;
-  const res = await fetch(url);
-  const transactions = await res.json();
+  const transactions = await journalDataService.fetchRegister({ account, query });
 
   const tbody = document.querySelector("#register tbody");
   tbody.innerHTML = "";
@@ -190,10 +242,8 @@ async function loadRegister(account = null, query = currentJournalSearch) {
 async function loadJournal(filters = {}) {
   setLoading(true);
   try {
-    const params = new URLSearchParams({journals: selectedJournals.join(','), ...filters});
-    if (debugMode) console.log("Loading journal with params:", params.toString());
-    const res = await fetch(`/journal?${params.toString()}`);
-    const data = await res.json();
+    if (debugMode) console.log("Loading journal with params:", filters);
+    const data = await journalDataService.fetchJournal(filters);
     currentJournalTransactions = data;
 
     const tbody = document.querySelector("#journal-table tbody");
@@ -530,23 +580,7 @@ for (const controlId of ["chart-type", "chart-account-class", "chart-grouping", 
 }
 
 function chartAmountsForClass() {
-  const accountClass = document.getElementById("chart-account-class").value.toLowerCase();
-  const amounts = [];
-  for (const transaction of currentJournalTransactions) {
-    for (const posting of transaction.postings) {
-      const account = posting.account || "";
-      if (account.split(":", 1)[0].toLowerCase() !== accountClass) continue;
-      for (const amount of posting.amount) {
-        amounts.push({
-          date: transaction.date,
-          account,
-          commodity: amount.commodity || "(no commodity)",
-          quantity: Number(amount.quantity),
-        });
-      }
-    }
-  }
-  return amounts.filter((amount) => Number.isFinite(amount.quantity));
+  return journalCharting.amountsForClass(currentJournalTransactions);
 }
 
 function updateJournalChart() {

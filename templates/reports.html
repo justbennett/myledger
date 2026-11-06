@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+{% macro help_icon(link, title="Help") -%}
+  <sup title="{{ title }}" style="cursor: help; font-size: small"><a href="{{ link }}" target="_blank">⍰</a></sup>
+{%- endmacro %}
+
+{% set title = "Report Maker" %}
+{% set subtitle = "Generate custom reports from your ledger data." %}
+{% set links = [
+    {"href": "/", "text": "Dashboard"},
+    {"href": "/logout", "text": "Logout"}
+] %}
+
+<html>
+<head>
+  <title>Hledger {{ title }}</title>
+  <link rel="stylesheet" href="/static/css/main.css?v=11">
+  <link rel="icon" type="image/png" href="/static/favicon.ico">
+</head>
+<body data-page="reports">
+  {% include '/components/header.html' %}
+
+  <main class="reports-main">
+    <section class="reports-panel">
+      <h2>Custom hledger report builder</h2>
+      <p class="report-subtitle">Generate plain-text hledger output for balances, registers, cashflow and other reports.{{ help_icon("https://hledger.org/1.52/hledger.html#standard-report-commands", "hledger manual") }}</p>
+
+      <form method="post" action="/reports" class="reports-form">
+        <div class="report-grid">
+          <label>
+            Report type
+            <select name="report_type">
+              {% for report_type in report_types %}
+                <option value="{{ report_type }}" {% if report_form.report_type == report_type %}selected{% endif %}>{{ report_type }}</option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label>
+            Begin date
+            <input type="date" name="begin" value="{{ report_form.begin }}">
+          </label>
+
+          <label>
+            End date
+            <input type="date" name="end" value="{{ report_form.end }}">
+          </label>
+
+          <label>
+            Account filter
+            <input type="text" name="account" value="{{ report_form.account }}" placeholder="assets:cash or liabilities:credit-card">
+          </label>
+
+          <label>
+            Query / filter
+            <input type="text" name="query" value="{{ report_form.query }}" placeholder="food or acct:assets and not cash">
+          </label>
+
+          <label>
+            Depth
+            <input type="number" name="depth" min="1" step="1" value="{{ report_form.depth }}" placeholder="Optional">
+          </label>
+
+          <label>
+            Period
+            <select name="period">
+              <option value="" {% if not report_form.period %}selected{% endif %}>Default</option>
+              <option value="daily" {% if report_form.period == "daily" %}selected{% endif %}>Daily</option>
+              <option value="weekly" {% if report_form.period == "weekly" %}selected{% endif %}>Weekly</option>
+              <option value="monthly" {% if report_form.period == "monthly" %}selected{% endif %}>Monthly</option>
+              <option value="quarterly" {% if report_form.period == "quarterly" %}selected{% endif %}>Quarterly</option>
+              <option value="yearly" {% if report_form.period == "yearly" %}selected{% endif %}>Yearly</option>
+            </select>
+          </label>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="tree" {% if report_form.tree %}checked{% endif %}>
+            Tree view
+          </label>
+
+          <label class="checkbox-field">
+            <input type="checkbox" name="empty" {% if report_form.empty %}checked{% endif %}>
+            Include empty accounts
+          </label>
+        </div>
+
+        <p class="full-width">
+          Extra hledger arguments{{ help_icon("https://hledger.org/1.51/hledger.html", "hledger manual") }}</p>
+          <input type="text" name="extra_args" value="{{ report_form.extra_args }}" placeholder="--sort-amount or --format csv">
+
+        <div class="form-actions">
+          <button type="submit" class="dark">Submit command</button>
+          <a href="/reports" class="secondary-link">Reset</a>
+        </div>
+      </form>
+
+      {% if report_command %}
+        <div class="report-command">
+          <h3>hledger command</h3>
+          <textarea id="report-command-input" rows="4" spellcheck="false" readonly aria-readonly="true" aria-label="hledger command preview">{{ report_command }}</textarea>
+        </div>
+      {% endif %}
+
+      <div class="journal-view-tabs" role="tablist" aria-label="Reports views">
+        <button type="button" id="report-view-tab" class="journal-view-tab active" data-tab="report" role="tab" aria-selected="true" aria-controls="reports-tab-report" tabindex="0">Report</button>
+        <button type="button" id="chart-view-tab" class="journal-view-tab" data-tab="chart" role="tab" aria-selected="false" aria-controls="reports-tab-chart" tabindex="-1">Chart</button>
+      </div>
+
+      <div id="reports-tab-report" class="reports-tab-panel active" role="tabpanel">
+        {% if report_error %}
+          <div class="report-error">
+            <strong>Report error:</strong>
+            <pre>{{ report_error }}</pre>
+          </div>
+        {% endif %}
+
+        {% if report_output %}
+          <div class="report-output">
+            <div class="report-output-header">
+              <h3>Report output</h3>
+              <div class="report-output-actions">
+                <button type="button" id="fullscreen-report-output" class="dark small-button">Full screen</button>
+                <button type="button" id="download-report-output" class="dark small-button">Download report</button>
+              </div>
+            </div>
+            <pre id="report-output-text">{{ report_output }}</pre>
+          </div>
+        {% endif %}
+      </div>
+
+      <div id="reports-tab-chart" class="reports-tab-panel" role="tabpanel" hidden>
+        <div id="report-chart-panel" class="report-chart-panel">
+          <div class="report-output-header">
+            <h3>Chart</h3>
+          </div>
+          <div class="report-chart-controls">
+            <label>
+              Chart type
+              <select id="report-chart-type">
+                <option value="bar">Bar</option>
+                <option value="pie">Pie</option>
+              </select>
+            </label>
+            <button type="button" id="generate-report-chart" class="dark small-button">Generate chart</button>
+          </div>
+          <div id="report-chart-area" class="report-chart-area" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="report-download-dialog" aria-labelledby="report-download-title">
+    <form id="report-download-form">
+      <div class="journal-editor-header">
+        <h2 id="report-download-title">Download report</h2>
+        <button type="button" class="icon-button" id="report-download-cancel" aria-label="Cancel" title="Close">×</button>
+      </div>
+      <label for="report-download-format">Output format</label>
+      <select id="report-download-format" required>
+        <option value="txt">Plain text (.txt)</option>
+        <option value="html">HTML (.html)</option>
+        <option value="csv">CSV (.csv)</option>
+        <option value="fods">OpenSpreadsheet (.fods)</option>
+        <option value="sql">SQL (.sql)</option>
+        <option value="json">JSON (.json)</option>
+      </select>
+      <p>Select the desired output format for this report.</p>
+      <div class="journal-editor-actions">
+        <button type="button" class="dark" id="report-download-cancel-button">Cancel</button>
+        <button type="submit" class="dark">Download</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const reportForm = document.querySelector("form.reports-form");
+      const reportCommandInput = document.getElementById("report-command-input");
+      const chartPanel = document.getElementById("report-chart-panel");
+      const chartTypeSelect = document.getElementById("report-chart-type");
+      const chartArea = document.getElementById("report-chart-area");
+      const generateChartButton = document.getElementById("generate-report-chart");
+      const chartableReportTypes = new Set(["balance", "cashflow"]);
+      const reportTabs = document.querySelectorAll(".journal-view-tab");
+      const tabPanels = document.querySelectorAll(".reports-tab-panel");
+
+      const showTab = (tabName) => {
+        reportTabs.forEach((tab) => {
+          const active = tab.dataset.tab === tabName;
+          tab.classList.toggle("active", active);
+          tab.setAttribute("aria-selected", active ? "true" : "false");
+          tab.tabIndex = active ? 0 : -1;
+        });
+
+        tabPanels.forEach((panel) => {
+          const active = panel.id === `reports-tab-${tabName}`;
+          panel.hidden = !active;
+          panel.classList.toggle("active", active);
+        });
+      };
+
+      reportTabs.forEach((tab) => {
+        tab.addEventListener("click", () => showTab(tab.dataset.tab));
+      });
+
+      const sanitizeValue = (value) => value === null || value === undefined ? "" : String(value);
+
+      const chartAvailability = () => {
+        if (!reportForm) return false;
+        const reportType = document.querySelector('select[name="report_type"]').value || "balance";
+        if (!chartableReportTypes.has(reportType)) {
+          return false;
+        }
+        const period = document.querySelector('select[name="period"]').value;
+        const begin = document.querySelector('input[name="begin"]').value;
+        const end = document.querySelector('input[name="end"]').value;
+        return Boolean(period || begin || end);
+      };
+
+      const syncChartControls = () => {
+        if (!chartPanel || !chartTypeSelect) return;
+        const available = chartAvailability();
+        const chartTab = document.querySelector('.journal-view-tab[data-tab="chart"]');
+        if (chartTab) {
+          chartTab.disabled = !available;
+          chartTab.style.opacity = available ? "1" : "0.5";
+        }
+        if (!available) {
+          chartArea.innerHTML = "";
+          return;
+        }
+
+        const periodValue = document.querySelector('select[name="period"]').value;
+        const pieOption = chartTypeSelect.querySelector('option[value="pie"]');
+        const barOption = chartTypeSelect.querySelector('option[value="bar"]');
+        if (!periodValue) {
+          pieOption.disabled = false;
+          barOption.disabled = true;
+          if (chartTypeSelect.value !== "pie") {
+            chartTypeSelect.value = "pie";
+          }
+        } else {
+          pieOption.disabled = true;
+          barOption.disabled = false;
+          if (chartTypeSelect.value === "pie") {
+            chartTypeSelect.value = "bar";
+          }
+        }
+      };
+
+      const renderPieChart = (series) => {
+        if (!series || series.length === 0) {
+          chartArea.innerHTML = '<p class="chart-empty">No data available for a pie chart.</p>';
+          return;
+        }
+
+        const total = series.reduce((sum, point) => sum + Math.abs(point.value), 0);
+        const radius = 90;
+        const center = 110;
+        const arcs = [];
+        let startAngle = -Math.PI / 2;
+
+        series.forEach((point) => {
+          const slice = (Math.abs(point.value) / total) * Math.PI * 2;
+          const endAngle = startAngle + slice;
+          const x1 = center + Math.cos(startAngle) * radius;
+          const y1 = center + Math.sin(startAngle) * radius;
+          const x2 = center + Math.cos(endAngle) * radius;
+          const y2 = center + Math.sin(endAngle) * radius;
+          const largeArc = slice > Math.PI ? 1 : 0;
+          const path = `M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+          arcs.push(`<path d="${path}" fill="${point.color || '#167d75'}" stroke="#fff" stroke-width="1"></path>`);
+          startAngle = endAngle;
+        });
+
+        const legend = series.map((point) => `<div class="chart-legend-item"><span class="legend-swatch" style="background:${point.color || '#167d75'}"></span>${point.label}: ${point.value.toFixed(2)}</div>`).join('');
+        chartArea.innerHTML = `
+          <svg viewBox="0 0 220 220" class="report-chart-svg" role="img" aria-label="Pie chart">
+            ${arcs.join('')}
+            <circle cx="110" cy="110" r="42" fill="#fff"></circle>
+          </svg>
+          <div class="chart-legend">${legend}</div>
+        `;
+      };
+
+      const renderBarChart = (data) => {
+        const labels = data.labels || [];
+        const series = data.series || [];
+        if (!labels.length || !series.length) {
+          chartArea.innerHTML = '<p class="chart-empty">No chart data available for the selected report.</p>';
+          return;
+        }
+
+        const width = 720;
+        const height = 300;
+        const pad = { top: 20, right: 20, bottom: 60, left: 60 };
+        const maxValue = Math.max(...series.flatMap((item) => item.values || [0]), 0);
+        const groupWidth = (width - pad.left - pad.right) / labels.length;
+        const innerWidth = width - pad.left - pad.right;
+        const barGap = 8;
+        const barWidth = Math.max(12, Math.min(28, (groupWidth - barGap) / Math.max(series.length, 1)));
+
+        const axis = `
+          <line x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" stroke="#475569" />
+          <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" stroke="#475569" />
+        `;
+
+        const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = height - pad.bottom - (height - pad.top - pad.bottom) * ratio;
+          return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="#e2e8f0" />`;
+        }).join('');
+
+        const bars = series.map((item, seriesIndex) => {
+          const values = item.values || [];
+          return values.map((value, index) => {
+            const xBase = pad.left + (index * groupWidth) + (seriesIndex * barWidth) + 6;
+            const barHeight = ((Math.abs(value) / Math.max(maxValue, 1)) * (height - pad.top - pad.bottom));
+            const yBase = height - pad.bottom;
+            const y = value >= 0 ? yBase - barHeight : yBase;
+            const finalHeight = value >= 0 ? barHeight : Math.abs(barHeight);
+            return `
+              <rect x="${xBase}" y="${y}" width="${Math.max(8, barWidth - 4)}" height="${finalHeight}" fill="${item.color || ['#167d75', '#3b82f6', '#f59e0b', '#8b5cf6'][seriesIndex % 4]}" rx="2"></rect>
+            `;
+          }).join('');
+        }).join('');
+
+        const labelsMarkup = labels.map((label, index) => {
+          const x = pad.left + index * groupWidth + groupWidth / 2;
+          return `<text x="${x}" y="${height - 18}" text-anchor="middle" font-size="10">${label.slice(0, 8)}</text>`;
+        }).join('');
+
+        const legend = series.map((item, index) => `<div class="chart-legend-item"><span class="legend-swatch" style="background:${item.color || ['#167d75', '#3b82f6', '#f59e0b', '#8b5cf6'][index % 4]}"></span>${item.label}</div>`).join('');
+
+        chartArea.innerHTML = `
+          <svg viewBox="0 0 ${width} ${height}" class="report-chart-svg" role="img" aria-label="Bar chart">
+            ${axis}
+            ${yTicks}
+            ${bars}
+            ${labelsMarkup}
+          </svg>
+          <div class="chart-legend">${legend}</div>
+        `;
+      };
+
+      const fetchChartData = async () => {
+        if (!reportForm || !chartArea) return;
+        const reportType = document.querySelector('select[name="report_type"]').value || "balance";
+        const begin = document.querySelector('input[name="begin"]').value;
+        const end = document.querySelector('input[name="end"]').value;
+        const account = document.querySelector('input[name="account"]').value;
+        const query = document.querySelector('input[name="query"]').value;
+        const depth = document.querySelector('input[name="depth"]').value;
+        const period = document.querySelector('select[name="period"]').value;
+        const tree = document.querySelector('input[name="tree"]').checked ? 'true' : 'false';
+        const empty = document.querySelector('input[name="empty"]').checked ? 'true' : 'false';
+        const extraArgs = document.querySelector('input[name="extra_args"]').value;
+        const chartType = chartTypeSelect ? chartTypeSelect.value : 'bar';
+        const params = new URLSearchParams({
+          report_type: reportType,
+          begin,
+          end,
+          account,
+          query,
+          depth,
+          period,
+          tree,
+          empty,
+          extra_args: extraArgs,
+          chart_type: chartType,
+        });
+
+        chartArea.innerHTML = '<div class="loading">Loading chart...</div>';
+
+        try {
+          const response = await fetch(`/reports/chart?${params.toString()}`);
+          if (!response.ok) {
+            const detail = await response.text();
+            throw new Error(detail || `HTTP ${response.status}`);
+          }
+          const payload = await response.json();
+          if (payload.chart_type === 'pie') {
+            const colored = (payload.series || []).map((point, index) => ({ ...point, color: ['#167d75', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'][index % 5] }));
+            renderPieChart(colored);
+          } else {
+            renderBarChart(payload);
+          }
+        } catch (error) {
+          chartArea.innerHTML = `<p class="chart-empty">Chart unavailable: ${sanitizeValue(error.message)}</p>`;
+        }
+      };
+
+      const quoteArg = (value) => {
+        if (value === undefined || value === null) {
+          return "''";
+        }
+        const stringValue = String(value).trim();
+        if (!stringValue) {
+          return "''";
+        }
+        if (/^[A-Za-z0-9_./:-]+$/.test(stringValue)) {
+          return stringValue;
+        }
+        return `'${stringValue.replace(/'/g, "'\\''")}'`;
+      };
+
+      const splitExtraArgs = (rawValue) => {
+        const value = (rawValue || "").trim();
+        if (!value) {
+          return [];
+        }
+
+        const matches = value.match(/(?:[^\s"']+|"(?:\\.|[^"])*"|'(?:\\.|[^'])*')+/g) || [];
+        return matches.map((token) => {
+          if ((token.startsWith('"') && token.endsWith('"')) || (token.startsWith("'") && token.endsWith("'"))) {
+            return token.slice(1, -1);
+          }
+          return token;
+        });
+      };
+
+      const buildCommandPreview = () => {
+        if (!reportForm) {
+          return reportCommandInput ? reportCommandInput.value : "";
+        }
+
+        const reportType = document.querySelector('select[name="report_type"]').value || "balance";
+        const begin = document.querySelector('input[name="begin"]').value;
+        const end = document.querySelector('input[name="end"]').value;
+        const account = document.querySelector('input[name="account"]').value;
+        const query = document.querySelector('input[name="query"]').value;
+        const depth = document.querySelector('input[name="depth"]').value;
+        const period = document.querySelector('select[name="period"]').value;
+        const tree = document.querySelector('input[name="tree"]').checked;
+        const empty = document.querySelector('input[name="empty"]').checked;
+        const extraArgs = document.querySelector('input[name="extra_args"]').value;
+        const extraTokens = splitExtraArgs(extraArgs);
+
+        const commandArgs = ["hledger", reportType];
+        if (reportType === "balance" && !extraTokens.some((token) => token === "-H" || token === "--historical")) {
+          commandArgs.push("--historical");
+        }
+        if (begin) commandArgs.push("--begin", begin);
+        if (end) commandArgs.push("--end", end);
+        if (depth) commandArgs.push("--depth", depth);
+        if (period) commandArgs.push("--period", period);
+        if (tree) commandArgs.push("--tree");
+        if (empty) commandArgs.push("--empty");
+        if (account) commandArgs.push(account);
+        if (query) commandArgs.push(query);
+        if (extraTokens.length) commandArgs.push(...extraTokens);
+
+        return commandArgs.map(quoteArg).join(" ");
+      };
+
+      if (reportForm && reportCommandInput) {
+        const syncCommandPreview = () => {
+          reportCommandInput.value = buildCommandPreview();
+        };
+
+        reportForm.addEventListener("input", () => {
+          syncCommandPreview();
+          syncChartControls();
+        });
+        reportForm.addEventListener("change", () => {
+          syncCommandPreview();
+          syncChartControls();
+        });
+        syncCommandPreview();
+      }
+
+      if (chartTypeSelect) {
+        chartTypeSelect.addEventListener("change", syncChartControls);
+      }
+
+      if (generateChartButton) {
+        generateChartButton.addEventListener("click", fetchChartData);
+      }
+
+      syncChartControls();
+      if (chartPanel && !chartPanel.hidden) {
+        fetchChartData();
+      }
+
+      const button = document.getElementById("download-report-output");
+      const fullscreenButton = document.getElementById("fullscreen-report-output");
+      const dialog = document.getElementById("report-download-dialog");
+      const cancelButton = document.getElementById("report-download-cancel");
+      const cancelActionButton = document.getElementById("report-download-cancel-button");
+      const form = document.getElementById("report-download-form");
+      const outputText = document.getElementById("report-output-text");
+      const reportOutput = outputText ? outputText.closest(".report-output") : null;
+
+      if (fullscreenButton && reportOutput) {
+        const syncFullScreenButtonLabel = () => {
+          fullscreenButton.textContent = reportOutput.classList.contains("is-full-window")
+            ? "Exit full screen"
+            : "Full screen";
+        };
+
+        fullscreenButton.addEventListener("click", () => {
+          if (!outputText || !outputText.textContent.trim()) {
+            window.alert("There is no report output to display full screen.");
+            return;
+          }
+
+          const isExpanded = reportOutput.classList.toggle("is-full-window");
+          syncFullScreenButtonLabel();
+
+          if (isExpanded) {
+            document.body.style.overflow = "hidden";
+          } else {
+            document.body.style.overflow = "";
+          }
+        });
+
+        syncFullScreenButtonLabel();
+      }
+
+      if (button && dialog) {
+        button.addEventListener("click", () => {
+          if (!outputText || !outputText.textContent.trim()) {
+            window.alert("There is no report output to download.");
+            return;
+          }
+          dialog.showModal();
+        });
+      }
+
+      [cancelButton, cancelActionButton].forEach((element) => {
+        if (element) {
+          element.addEventListener("click", () => {
+            if (dialog && dialog.open) {
+              dialog.close();
+            }
+          });
+        }
+      });
+
+      if (form) {
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (!outputText || !outputText.textContent.trim()) {
+            window.alert("There is no report output to download.");
+            return;
+          }
+
+          const outputFormat = document.getElementById("report-download-format").value;
+          const params = new URLSearchParams({
+            report_type: document.querySelector('select[name="report_type"]').value,
+            begin: document.querySelector('input[name="begin"]').value,
+            end: document.querySelector('input[name="end"]').value,
+            account: document.querySelector('input[name="account"]').value,
+            query: document.querySelector('input[name="query"]').value,
+            depth: document.querySelector('input[name="depth"]').value,
+            period: document.querySelector('select[name="period"]').value,
+            tree: document.querySelector('input[name="tree"]').checked ? 'true' : 'false',
+            empty: document.querySelector('input[name="empty"]').checked ? 'true' : 'false',
+            extra_args: document.querySelector('input[name="extra_args"]').value,
+            output: outputFormat,
+          });
+
+          try {
+            const response = await fetch(`/reports/download?${params.toString()}`);
+            if (!response.ok) {
+              const detail = await response.text();
+              throw new Error(detail || `HTTP ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `report.${outputFormat}`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            if (dialog && dialog.open) {
+              dialog.close();
+            }
+          } catch (error) {
+            console.error("Report download failed:", error);
+            window.alert(`Report download failed: ${error.message}`);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

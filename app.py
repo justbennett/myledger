@@ -63,6 +63,10 @@ JOURNAL_DIR = LEDGER_DATA_DIR / "journals"
 RULES_DIR = LEDGER_DATA_DIR / "rules"
 JOURNAL = str(JOURNAL_DIR / "main.journal")
 
+# =========================
+# App setup and configuration
+# =========================
+
 #************** Helper functions ***************************
 def hledger(args, files=None):
     if files is None:
@@ -215,6 +219,10 @@ def parse_hledger_rows(rows):
 
     return tree
 
+# =========================
+# Journal and register data helpers
+# =========================
+
 def group_register_rows(rows):
     grouped = defaultdict(list)
     for row in rows:
@@ -285,7 +293,390 @@ def resolve_data_file(directory, filename):
         raise HTTPException(status_code=404, detail="File not found")
     return file_path
 
-# API Endpoints ***************************
+# =========================
+# Report generation and shared hledger argument parsing
+# =========================
+REPORT_TYPES = [
+    "balance",
+    "register",
+    "cashflow",
+    "print",
+    "accounts",
+]
+
+CHARTABLE_REPORT_TYPES = {"balance", "cashflow"}
+CHART_TYPES = {"bar", "pie"}
+
+
+def parse_checkbox_value(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() not in {"", "0", "false", "off", "no"}
+
+
+def parse_extra_hledger_args(raw_value):
+    value = (raw_value or "").strip()
+    if not value:
+        return []
+    try:
+        return shlex.split(value)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=f"Invalid extra arguments: {error}") from error
+
+
+def has_hledger_flag(tokens, *flag_names):
+    normalized = {token.strip() for token in tokens}
+    return any(flag in normalized for flag in flag_names)
+
+
+def parse_common_hledger_filters(form_data):
+    return {
+        "begin": (form_data.get("begin") or "").strip(),
+        "end": (form_data.get("end") or "").strip(),
+        "account": (form_data.get("account") or "").strip(),
+        "query": (form_data.get("query") or "").strip(),
+        "depth": (form_data.get("depth") or "").strip(),
+        "period": (form_data.get("period") or "").strip().lower(),
+        "tree": parse_checkbox_value(form_data.get("tree"), default=False),
+        "empty": parse_checkbox_value(form_data.get("empty"), default=False),
+        "extra_args": (form_data.get("extra_args") or "").strip(),
+    }
+
+
+def apply_common_hledger_filters(args, filters, *, include_account_query=True, include_tree=False, include_empty=False, include_extra_args=True):
+    begin = filters.get("begin", "")
+    end = filters.get("end", "")
+    depth = filters.get("depth", "")
+    period = filters.get("period", "")
+    tree = bool(filters.get("tree", False))
+    empty = bool(filters.get("empty", False))
+    account = filters.get("account", "")
+    query = filters.get("query", "")
+    extra_args = filters.get("extra_args", "")
+
+    if begin:
+        args.extend(["--begin", begin])
+    if end:
+        args.extend(["--end", end])
+    if depth:
+        args.extend(["--depth", depth])
+    if period:
+        args.extend(["--period", period])
+    if include_tree and tree:
+        args.append("--tree")
+    if include_empty and empty:
+        args.append("--empty")
+
+    if include_account_query:
+        if account:
+            args.append(account)
+        if query:
+            try:
+                args.extend(shlex.split(query))
+            except ValueError as error:
+                raise HTTPException(status_code=400, detail=f"Invalid query quoting: {error}") from error
+
+    if include_extra_args and extra_args:
+        extra_tokens = parse_extra_hledger_args(extra_args)
+        if any(token in {"-f", "--file"} for token in extra_tokens):
+            raise HTTPException(status_code=400, detail="Use the app's configured journal file; do not override -f/--file.")
+        args.extend(extra_tokens)
+
+    return args
+
+
+def build_hledger_report_args(form_data):
+    report_type = (form_data.get("report_type") or "balance").strip().lower()
+    if report_type not in REPORT_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid report type")
+
+    filters = parse_common_hledger_filters(form_data)
+    extra_tokens = parse_extra_hledger_args(filters.get("extra_args"))
+
+    args = [report_type]
+    if report_type == "balance" and not has_hledger_flag(extra_tokens, "-H", "--historical"):
+        args.append("--historical")
+
+    apply_common_hledger_filters(
+        args,
+        filters,
+        include_account_query=True,
+        include_tree=True,
+        include_empty=True,
+        include_extra_args=True,
+    )
+    return args
+
+
+def normalize_hledger_amount(value):
+    if value is None:
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, list):
+        return normalize_hledger_amount(value[0]) if value else 0.0
+    if isinstance(value, dict):
+        quantity = value.get("aquantity") or value.get("quantity")
+        if isinstance(quantity, dict):
+            return float(quantity.get("floatingPoint", 0.0))
+        return float(value.get("floatingPoint", 0.0))
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return 0.0
+    return 0.0
+
+
+def build_hledger_chart_payload(form_data, chart_type):
+    chart_type = (chart_type or "bar").strip().lower()
+    if chart_type not in CHART_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid chart type")
+
+    report_type = (form_data.get("report_type") or "balance").strip().lower()
+    if report_type not in CHARTABLE_REPORT_TYPES:
+        raise HTTPException(status_code=400, detail="Charts are only available for balance and cashflow reports")
+
+    filters = parse_common_hledger_filters(form_data)
+    if chart_type == "bar" and not filters.get("period"):
+        raise HTTPException(status_code=400, detail="Bar charts require a report period such as daily, weekly, monthly, quarterly, or yearly")
+    if chart_type == "pie" and filters.get("period"):
+        raise HTTPException(status_code=400, detail="Pie charts require a date range without a period")
+
+    extra_tokens = parse_extra_hledger_args(filters.get("extra_args"))
+    args = [report_type]
+    if report_type == "balance" and not has_hledger_flag(extra_tokens, "-H", "--historical"):
+        args.append("--historical")
+
+    apply_common_hledger_filters(
+        args,
+        filters,
+        include_account_query=True,
+        include_tree=True,
+        include_empty=True,
+        include_extra_args=True,
+    )
+    args.extend(["-O", "json"])
+
+    raw = hledger(args)
+    payload = json.loads(raw)
+
+    if chart_type == "pie":
+        rows = payload[0] if isinstance(payload, list) and len(payload) > 0 and isinstance(payload[0], list) else []
+        series = []
+        for row in rows:
+            if not row or len(row) < 4:
+                continue
+            label = str(row[0]).strip()
+            value = normalize_hledger_amount(row[3])
+            if label and value != 0:
+                series.append({"label": label, "value": value})
+        return {"chart_type": "pie", "series": series}
+
+    if isinstance(payload, dict):
+        raw_dates = payload.get("prDates", [])
+        labels = []
+        for group in raw_dates:
+            for entry in group if isinstance(group, list) else [group]:
+                if isinstance(entry, dict):
+                    labels.append(entry.get("contents") or "")
+        series = []
+        for row in payload.get("prRows", []):
+            name = row.get("prrName")
+            amounts = row.get("prrAmounts", [])
+            if not name:
+                continue
+            values = []
+            for cell in amounts:
+                values.append(normalize_hledger_amount(cell))
+            if values:
+                series.append({"label": name, "values": values})
+        return {"chart_type": "bar", "labels": labels, "series": series}
+
+    raise HTTPException(status_code=400, detail="The selected report does not produce chartable multi-period data")
+
+
+def build_hledger_command(args, files=None):
+    if files is None:
+        files = [JOURNAL]
+
+    command = ["hledger"]
+    for file_path in files:
+        command.extend(["-f", str(file_path)])
+    command.extend(args)
+    return command
+
+# =========================
+# HTML report endpoints
+# =========================
+
+@app.get("/reports", response_class=HTMLResponse, summary="Reports page")
+def reports(request: Request):
+    default_form = {
+        "report_type": "balance",
+        "begin": "",
+        "end": "",
+        "account": "",
+        "query": "",
+        "depth": "",
+        "period": "",
+        "tree": True,
+        "empty": True,
+        "extra_args": "",
+    }
+    default_command = shlex.join(build_hledger_command(build_hledger_report_args(default_form)))
+    return templates.TemplateResponse(
+        request,
+        "reports.html",
+        {
+            "report_types": REPORT_TYPES,
+            "report_form": default_form,
+            "report_output": "",
+            "report_error": "",
+            "report_command": default_command,
+        },
+    )
+
+
+@app.get("/reports/chart", summary="Return chart-friendly output for supported report types")
+def chart_report(
+    report_type: str | None = None,
+    begin: str | None = None,
+    end: str | None = None,
+    account: str | None = None,
+    query: str | None = None,
+    depth: str | None = None,
+    period: str | None = None,
+    tree: str | None = None,
+    empty: str | None = None,
+    extra_args: str | None = None,
+    chart_type: str | None = None,
+):
+    report_form = {
+        "report_type": report_type or "balance",
+        **parse_common_hledger_filters({
+            "begin": begin,
+            "end": end,
+            "account": account,
+            "query": query,
+            "depth": depth,
+            "period": period,
+            "tree": tree,
+            "empty": empty,
+            "extra_args": extra_args,
+        }),
+    }
+    return JSONResponse(build_hledger_chart_payload(report_form, chart_type or "bar"))
+
+
+@app.get("/reports/download", summary="Download a generated hledger report")
+def download_report(
+    report_type: str | None = None,
+    begin: str | None = None,
+    end: str | None = None,
+    account: str | None = None,
+    query: str | None = None,
+    depth: str | None = None,
+    period: str | None = None,
+    tree: str | None = None,
+    empty: str | None = None,
+    extra_args: str | None = None,
+    output: str | None = None,
+):
+    supported_outputs = {
+        "txt",
+        "html",
+        "csv",
+        "fods",
+        "sql",
+        "json",
+    }
+    if output is None or output not in supported_outputs:
+        raise HTTPException(status_code=400, detail="Invalid output format")
+
+    report_form = {
+        "report_type": report_type or "balance",
+        **parse_common_hledger_filters({
+            "begin": begin,
+            "end": end,
+            "account": account,
+            "query": query,
+            "depth": depth,
+            "period": period,
+            "tree": tree,
+            "empty": empty,
+            "extra_args": extra_args,
+        }),
+    }
+    args = build_hledger_report_args(report_form)
+    args.extend(["-O", output])
+    file_content = hledger(args)
+    media_types = {
+        "txt": "text/plain; charset=utf-8",
+        "html": "text/html; charset=utf-8",
+        "csv": "text/csv; charset=utf-8",
+        "fods": "application/vnd.oasis.opendocument.spreadsheet-template; charset=utf-8",
+        "sql": "application/sql; charset=utf-8",
+        "json": "application/json; charset=utf-8",
+    }
+    filename = f"{(report_form['report_type'] or 'report')}.{output}"
+    return Response(
+        content=file_content,
+        media_type=media_types[output],
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
+    )
+
+
+@app.post("/reports", response_class=HTMLResponse, summary="Generate a custom hledger report")
+async def generate_report(request: Request):
+    form_data = await request.form()
+    report_form = {
+        "report_type": form_data.get("report_type", "balance"),
+        **parse_common_hledger_filters(form_data),
+    }
+
+    report_command = ""
+    report_error = ""
+    report_output = ""
+
+    try:
+        args = build_hledger_report_args(report_form)
+        command = build_hledger_command(args)
+        report_command = shlex.join(command)
+        output = hledger(args)
+    except HTTPException as exc:
+        report_error = exc.detail
+        if "report_form" in locals():
+            try:
+                report_command = shlex.join(build_hledger_command(build_hledger_report_args(report_form)))
+            except Exception:
+                report_command = ""
+        output = None
+    except RuntimeError as exc:
+        report_error = str(exc).strip() or "The report command failed."
+        output = None
+
+    if output is not None:
+        report_output = output
+
+    return templates.TemplateResponse(
+        request,
+        "reports.html",
+        {
+            "report_types": REPORT_TYPES,
+            "report_form": report_form,
+            "report_output": report_output,
+            "report_error": report_error,
+            "report_command": report_command,
+        },
+    )
+
+# =========================
+# Balance and data list endpoints
+# =========================
+
 @app.get("/balance", summary="Get the balance of the ledger")
 def balance(
     journals: str | None = None,
@@ -326,6 +717,10 @@ def balance(
     rows = json.loads(out)
     tree = parse_hledger_rows(rows[0])  # the outermost array
     return tree
+
+# =========================
+# Journal file management
+# =========================
 
 @app.get("/journals", summary="List all journal files")
 def list_journals():
@@ -412,6 +807,10 @@ async def update_journal_file(filename: str, request: Request):
 
     return {"success": True}
 
+# =========================
+# Register and journal data endpoints
+# =========================
+
 @app.get("/register", summary="Return register transactions")
 def register(
     journals: str | None = None,
@@ -420,21 +819,32 @@ def register(
     end: str | None = None,
     query: str | None = None,
 ):
+    filters = parse_common_hledger_filters({
+        "begin": begin,
+        "end": end,
+        "account": account,
+        "query": query,
+    })
     files = [str(JOURNAL_DIR / j) for j in journals.split(',')] if journals else [JOURNAL]
     args = ["register", "-O", "json"]
+    apply_common_hledger_filters(
+        args,
+        filters,
+        include_account_query=True,
+        include_tree=False,
+        include_empty=False,
+        include_extra_args=False,
+    )
 
-    if begin:
-        args += ["--begin", begin]
-    if end:
-        args += ["--end", end]
-    append_account_and_query(args, account, query)
+    raw = hledger(args, files)
+    rows = json.loads(raw)
+    transactions_out = build_register_transactions(rows, account_filter=account)
 
-    raw = hledger(args, files)  # get raw JSON output
-    rows = json.loads(raw) # parse JSON
+    return transactions_out
 
-    transactionsOut = build_register_transactions(rows, account_filter=account)
-
-    return transactionsOut
+# =========================
+# Auth and dashboard pages
+# =========================
 
 @app.get("/", response_class=HTMLResponse, summary="Dashboard page")
 def dashboard(request: Request):
@@ -450,6 +860,10 @@ def login_page(request: Request):
         "login.html",
         {"session_expired": request.query_params.get("expired") == "1"},
     )
+
+# =========================
+# Login and session handling
+# =========================
 
 @app.post("/login", summary="Handle login")
 def login(
@@ -495,6 +909,10 @@ def login(
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
+
+# =========================
+# Update and deployment helpers
+# =========================
 
 @app.get("/update-status", summary="Check for updates")
 def update_status():
@@ -561,6 +979,10 @@ def update():
         "message": "Update started. MyLedger will restart automatically.",
     }
 
+# =========================
+# Data import and journal editing endpoints
+# =========================
+
 @app.get("/move-data", response_class=HTMLResponse, summary="Move data page")
 def add_data(request: Request):
     return templates.TemplateResponse(
@@ -574,9 +996,9 @@ def journal(
     account: str | None = None,
     match: str | None = None,
     output: str | None = None,
-   # begin: str | None = None,
-   # end: str | None = None,
     query: str | None = None,
+    begin: str | None = None,
+    end: str | None = None,
 ):
     supported_outputs = {
         "txt",
@@ -592,9 +1014,22 @@ def journal(
     files = [str(JOURNAL_DIR / j) for j in journals.split(',')] if journals else [JOURNAL]
     args = ["print", "-O", output] if output else ["print", "--output-format=json"]
 
+    filters = parse_common_hledger_filters({
+        "begin": begin,
+        "end": end,
+        "account": account,
+        "query": query,
+    })
     if match:
-        args += ["-m ", match]
-    append_account_and_query(args, account, query)
+        args.extend(["-m", match])
+    apply_common_hledger_filters(
+        args,
+        filters,
+        include_account_query=True,
+        include_tree=False,
+        include_empty=False,
+        include_extra_args=False,
+    )
 
     out = hledger(args, files)
     if output is not None:
@@ -649,6 +1084,10 @@ def journal(
         })
 
     return results
+
+# =========================
+# Journal editing and transaction mutation
+# =========================
 
 @app.post("/journal/edit", summary="Edit a journal transaction")
 async def edit_journal_entry(request: Request):
@@ -748,6 +1187,10 @@ async def add_journal_entry(request: Request):
         journal_file.write(entry.replace("\n", newline) + newline)
 
     return {"success": True, "journal": journal_name}
+
+# =========================
+# Rules management
+# =========================
 
 @app.get("/get-rules", summary="Get the list of rules files")
 def get_rules():
