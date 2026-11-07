@@ -1,11 +1,80 @@
   <header>
-    <h1>{{title}}</h1>
-    <p>{{subtitle}}</p>
-    <div class="header-link">
-        <ul>
+    <div class="header-main">
+      <div class="header-title-group">
+        <h1>{{title}}</h1>
+        <p>{{subtitle}}</p>
+      </div>
+
+      <div class="header-actions">
+        <div class="header-link">
+          <ul>
             {% for link in links %}
-                <li><a href="{{ link.href }}">{{ link.text }}</a></li>
+              <li><a href="{{ link.href }}">{{ link.text }}</a></li>
             {% endfor %}
-        </ul>
+          </ul>
+        </div>
+
+        <label class="theme-picker" for="theme-select">
+          <span>Theme</span>
+          <select id="theme-select" aria-label="Choose a color theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+      </div>
     </div>
   </header>
+
+  <script>
+    (() => {
+      const storageKey = "myledger-theme";
+      const themeSelect = document.getElementById("theme-select");
+
+      const getStoredTheme = () => {
+        try {
+          return localStorage.getItem(storageKey) || "system";
+        } catch (error) {
+          return "system";
+        }
+      };
+
+      const applyTheme = (theme) => {
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const selectedTheme = theme === "dark" || (theme === "system" && prefersDark) ? "dark" : "light";
+        document.body.dataset.theme = selectedTheme;
+
+        if (themeSelect) {
+          themeSelect.value = theme;
+        }
+      };
+
+      const initialTheme = getStoredTheme();
+      applyTheme(initialTheme);
+
+      if (themeSelect) {
+        themeSelect.addEventListener("change", (event) => {
+          const nextTheme = event.target.value;
+          try {
+            localStorage.setItem(storageKey, nextTheme);
+          } catch (error) {
+            // Ignore storage access errors and fall back to the current browser preference.
+          }
+          applyTheme(nextTheme);
+        });
+      }
+
+      const systemPreference = window.matchMedia("(prefers-color-scheme: dark)");
+      const syncSystemTheme = () => {
+        if (getStoredTheme() === "system") {
+          applyTheme("system");
+        }
+      };
+
+      if (typeof systemPreference.addEventListener === "function") {
+        systemPreference.addEventListener("change", syncSystemTheme);
+      } else if (typeof systemPreference.addListener === "function") {
+        systemPreference.addListener(syncSystemTheme);
+      }
+    })();
+  </script>

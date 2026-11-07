@@ -15,6 +15,37 @@
   --theme-danger: #9f1239;
   --theme-shadow: rgb(0 0 0 / 5%);
   --theme-backdrop: rgb(15 23 42 / 45%);
+  --theme-header-bg: #1e293b;
+  --theme-header-fg: #fff;
+  --theme-button-bg: #1e293b;
+  --theme-button-fg: #fff;
+}
+
+body[data-theme="dark"] {
+  --theme-navy: #f8fafc;
+  --theme-page-background: #020817;
+  --theme-link-blue: #7dd3fc;
+  --theme-teal: #5eead4;
+  --theme-pale-lavender: #172033;
+  --theme-light-slate: #111827;
+  --theme-muted-slate: #cbd5e1;
+
+  --theme-surface: #0f172a;
+  --theme-border: #334155;
+  --theme-border-strong: #475569;
+  --theme-teal-pale: #102c35;
+  --theme-danger: #fca5a5;
+  --theme-shadow: rgb(2 6 23 / 55%);
+  --theme-backdrop: rgb(2 6 23 / 75%);
+  --theme-header-bg: #020817;
+  --theme-header-fg: #f8fafc;
+  --theme-button-bg: #0f172a;
+  --theme-button-fg: #f8fafc;
+  color-scheme: dark;
+}
+
+body[data-theme="light"] {
+  color-scheme: light;
 }
 
 *,
@@ -35,9 +66,54 @@ body {
 }
 
 header {
-  background: var(--theme-navy);
-  color: var(--theme-surface);
-  padding: 1rem 2rem ;
+  background: var(--theme-header-bg);
+  color: var(--theme-header-fg);
+  padding: 1rem 2rem;
+}
+
+.header-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.header-title-group h1,
+.header-title-group p {
+  margin: 0;
+}
+
+.header-title-group p {
+  margin-top: 0.25rem;
+  color: var(--theme-header-fg);
+  opacity: 0.85;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--theme-header-fg);
+  font-size: 0.85rem;
+}
+
+.theme-picker select {
+  min-width: 7rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  background: var(--theme-surface);
+  color: var(--theme-navy);
+  font: inherit;
 }
 
 main {
@@ -132,18 +208,23 @@ li {
   list-style: none;
 }
 
-.header-link li a{
+.header-link li a {
   text-decoration: none;
   text-align: right;
   padding: 0.5rem;
-  color: var(--theme-surface);
+  color: var(--theme-header-fg);
 }
 
-.header-link ul{
+.header-link li a:hover {
+  text-decoration: underline;
+}
+
+.header-link ul {
   display: flex;
   justify-content: flex-end;
   margin: 0;
   padding: 0;
+  list-style: none;
 }
 /* Make the journal tags go next to the section header*/
 .journal-tags {
@@ -420,12 +501,20 @@ main.move-data-main {
 }
 
 .reports-main {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  gap: 2rem;
+}
+
+.reports-layout {
+  display: flex;
+  align-items: flex-start;
 }
 
 .reports-panel {
   width: min(100%, 1100px);
   margin: 0 auto;
+  flex: 1 1 auto;
 }
 
 .report-subtitle {
@@ -640,8 +729,8 @@ button.dark,
 
 button.dark {
   border: none;
-  background: var(--theme-navy);
-  color: var(--theme-surface);
+  background: var(--theme-button-bg);
+  color: var(--theme-button-fg);
 }
 
 .secondary-link {

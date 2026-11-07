@@ -465,7 +465,8 @@ def build_hledger_chart_payload(form_data, chart_type):
     )
     args.extend(["-O", "json"])
 
-    raw = hledger(args)
+    files = parse_report_journals(form_data.get("journals"))
+    raw = hledger(args, files)
     payload = json.loads(raw)
 
     if chart_type == "pie":
@@ -503,6 +504,18 @@ def build_hledger_chart_payload(form_data, chart_type):
     raise HTTPException(status_code=400, detail="The selected report does not produce chartable multi-period data")
 
 
+def parse_report_journals(raw_value):
+    if raw_value is None:
+        return [JOURNAL]
+
+    selected = [part.strip() for part in str(raw_value).split(",") if part.strip()]
+    if not selected:
+        return [JOURNAL]
+
+    files = [str(JOURNAL_DIR / journal) for journal in selected]
+    return files
+
+
 def build_hledger_command(args, files=None):
     if files is None:
         files = [JOURNAL]
@@ -522,6 +535,7 @@ def reports(request: Request):
     today = datetime.today()
     default_form = {
         "report_type": "balance",
+        "journals": "main.journal",
         "begin": today.replace(month=1, day=1).date().isoformat(),
         "end": today.date().isoformat(),
         "account": "",
@@ -533,7 +547,7 @@ def reports(request: Request):
         "empty": True,
         "extra_args": "",
     }
-    default_command = shlex.join(build_hledger_command(build_hledger_report_args(default_form)))
+    default_command = shlex.join(build_hledger_command(build_hledger_report_args(default_form), parse_report_journals(default_form.get("journals"))))
     return templates.TemplateResponse(
         request,
         "reports.html",
@@ -550,6 +564,7 @@ def reports(request: Request):
 @app.get("/reports/chart", summary="Return chart-friendly output for supported report types")
 def chart_report(
     report_type: str | None = None,
+    journals: str | None = None,
     begin: str | None = None,
     end: str | None = None,
     account: str | None = None,
@@ -564,6 +579,7 @@ def chart_report(
 ):
     report_form = {
         "report_type": report_type or "balance",
+        "journals": journals or "main.journal",
         **parse_common_hledger_filters({
             "begin": begin,
             "end": end,
@@ -583,6 +599,7 @@ def chart_report(
 @app.get("/reports/download", summary="Download a generated hledger report")
 def download_report(
     report_type: str | None = None,
+    journals: str | None = None,
     begin: str | None = None,
     end: str | None = None,
     account: str | None = None,
@@ -608,6 +625,7 @@ def download_report(
 
     report_form = {
         "report_type": report_type or "balance",
+        "journals": journals or "main.journal",
         **parse_common_hledger_filters({
             "begin": begin,
             "end": end,
@@ -623,7 +641,7 @@ def download_report(
     }
     args = build_hledger_report_args(report_form)
     args.extend(["-O", output])
-    file_content = hledger(args)
+    file_content = hledger(args, parse_report_journals(report_form.get("journals")))
     media_types = {
         "txt": "text/plain; charset=utf-8",
         "html": "text/html; charset=utf-8",
@@ -645,23 +663,25 @@ async def generate_report(request: Request):
     form_data = await request.form()
     report_form = {
         "report_type": form_data.get("report_type", "balance"),
+        "journals": form_data.get("journals", "main.journal"),
         **parse_common_hledger_filters(form_data),
     }
 
     report_command = ""
     report_error = ""
     report_output = ""
+    journal_files = parse_report_journals(report_form.get("journals"))
 
     try:
         args = build_hledger_report_args(report_form)
-        command = build_hledger_command(args)
+        command = build_hledger_command(args, journal_files)
         report_command = shlex.join(command)
-        output = hledger(args)
+        output = hledger(args, journal_files)
     except HTTPException as exc:
         report_error = exc.detail
         if "report_form" in locals():
             try:
-                report_command = shlex.join(build_hledger_command(build_hledger_report_args(report_form)))
+                report_command = shlex.join(build_hledger_command(build_hledger_report_args(report_form), journal_files))
             except Exception:
                 report_command = ""
         output = None

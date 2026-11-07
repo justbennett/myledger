@@ -19,7 +19,9 @@
 <body data-page="reports">
   {% include '/components/header.html' %}
 
-  <main class="reports-main">
+  <main class="reports-main reports-layout">
+    {% include '/components/leftbar.html' %}
+
     <section class="reports-panel">
       <h2>Custom hledger Report Builder</h2>
       <p class="report-subtitle">Generate plain-text hledger output for balances,
@@ -27,6 +29,7 @@
          Charts will be available for some reports.{{ help_icon("https://hledger.org/1.52/hledger.html#standard-report-commands", "hledger manual") }}</p>
 
       <form method="post" action="/reports" class="reports-form" id="report-form">
+        <input type="hidden" name="journals" id="report-selected-journals" value="{{ report_form.journals | default('main.journal') }}">
         <div class="report-top-row">
           <div class="report-type-field">
             <label>
@@ -395,8 +398,10 @@
         const empty = document.querySelector('input[name="empty"]').checked ? 'true' : 'false';
         const extraArgs = document.querySelector('input[name="extra_args"]').value;
         const chartType = chartTypeSelect ? chartTypeSelect.value : 'bar';
+        const selectedJournals = Array.from(document.querySelectorAll('#journal-select option:checked')).map((option) => option.value).join(',') || 'main.journal';
         const params = new URLSearchParams({
           report_type: reportType,
+          journals: selectedJournals,
           begin,
           end,
           account,
@@ -648,8 +653,10 @@
           }
 
           const outputFormat = document.getElementById("report-download-format").value;
+          const selectedJournals = Array.from(document.querySelectorAll('#journal-select option:checked')).map((option) => option.value).join(',') || 'main.journal';
           const params = new URLSearchParams({
             report_type: document.querySelector('select[name="report_type"]').value,
+            journals: selectedJournals,
             begin: document.querySelector('input[name="begin"]').value,
             end: document.querySelector('input[name="end"]').value,
             account: document.querySelector('input[name="account"]').value,
@@ -688,6 +695,205 @@
         });
       }
     });
+  </script>
+
+  <script>
+    (() => {
+      const reportsState = {
+        selectedJournals: ["main.journal"],
+      };
+
+      const accountContainer = document.getElementById("accounts");
+      const journalSelect = document.getElementById("journal-select");
+      const journalToggle = document.getElementById("journal-toggle");
+      const reportAccountInput = document.querySelector('input[name="account"]');
+      const reportJournalsInput = document.getElementById("report-selected-journals");
+
+      const syncSelectedJournalsInput = () => {
+        if (!journalSelect || !reportJournalsInput) return;
+        const selected = Array.from(journalSelect.selectedOptions).map((option) => option.value);
+        reportJournalsInput.value = selected.length ? selected.join(",") : "main.journal";
+      };
+
+      const setAccountInput = (accountName) => {
+        if (!reportAccountInput) return;
+        reportAccountInput.value = accountName;
+        reportAccountInput.dispatchEvent(new Event("input", { bubbles: true }));
+        reportAccountInput.dispatchEvent(new Event("change", { bubbles: true }));
+      };
+
+      const renderAccountName = (accountName, filterAccount = accountName) => {
+        const label = document.createElement("span");
+        label.textContent = accountName ?? "(unnamed)";
+        label.className = "account-name";
+
+        const icon = document.createElement("button");
+        icon.type = "button";
+        icon.className = "filter-icon";
+        icon.title = "Apply this account to the report filter";
+        icon.textContent = " ▤";
+        icon.setAttribute("aria-label", `Use account ${filterAccount} in the report`);
+        icon.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (filterAccount) {
+            setAccountInput(filterAccount);
+          }
+        });
+
+        label.appendChild(icon);
+        return label;
+      };
+
+      const renderAccount = (node, depth = 0) => {
+        const li = document.createElement("li");
+        const row = document.createElement("span");
+        row.className = "account-row";
+        row.style.setProperty("--depth", depth);
+
+        const label = renderAccountName(node.name, node.account);
+        const amount = document.createElement("span");
+        amount.textContent = node.balance ? node.balance.map((entry) => entry.quantity ? `${entry.quantity}` : "").join(" ") || "0" : "0";
+        amount.className = "account-balance";
+        row.append(label, amount);
+
+        if (node.accounts && node.accounts.length > 0) {
+          const details = document.createElement("details");
+          const summary = document.createElement("summary");
+          summary.appendChild(row);
+          details.appendChild(summary);
+
+          const ul = document.createElement("ul");
+          node.accounts.forEach((child) => {
+            ul.appendChild(renderAccount(child, depth + 1));
+          });
+          details.appendChild(ul);
+          li.appendChild(details);
+        } else {
+          li.appendChild(row);
+        }
+
+        return li;
+      };
+
+      const updateIncludedJournals = () => {
+        const container = document.getElementById("included-journals");
+        if (!container) return;
+
+        container.innerHTML = "";
+        if (!reportsState.selectedJournals.length) return;
+
+        const tagContainer = document.createElement("div");
+        tagContainer.className = "journal-tags";
+        reportsState.selectedJournals.forEach((journal) => {
+          const tag = document.createElement("span");
+          tag.className = "journal-tag";
+          tag.textContent = journal.replace(".journal", "");
+          tagContainer.appendChild(tag);
+        });
+        container.appendChild(tagContainer);
+      };
+
+      const loadBalances = async () => {
+        if (!accountContainer) return;
+
+        try {
+          const params = new URLSearchParams({
+            journals: reportsState.selectedJournals.join(","),
+          });
+          const response = await fetch(`/balance?${params.toString()}`);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
+
+          accountContainer.innerHTML = "";
+          data.forEach((node) => {
+            accountContainer.appendChild(renderAccount(node));
+          });
+        } catch (error) {
+          console.error("Failed to load report balances:", error);
+          accountContainer.innerHTML = '<p class="chart-empty">Balances unavailable.</p>';
+        }
+      };
+
+      const applyJournals = async () => {
+        if (!journalSelect) return;
+        reportsState.selectedJournals = Array.from(journalSelect.selectedOptions).map((option) => option.value);
+        if (!reportsState.selectedJournals.length) {
+          reportsState.selectedJournals = ["main.journal"];
+          journalSelect.querySelector('option[value="main.journal"]')?.setAttribute("selected", "selected");
+        }
+        syncSelectedJournalsInput();
+        updateIncludedJournals();
+        await loadBalances();
+      };
+
+      const initReportLeftbar = async () => {
+        if (!journalSelect) return;
+
+        try {
+          const response = await fetch("/journals");
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const data = await response.json();
+
+          journalSelect.innerHTML = "";
+          const requestedJournals = (reportJournalsInput?.value || "main.journal")
+            .split(",")
+            .map((value) => value.trim())
+            .filter(Boolean);
+          const requestedSet = new Set(requestedJournals);
+
+          data.journals.forEach((journal) => {
+            const option = document.createElement("option");
+            option.value = journal;
+            option.textContent = journal.replace(".journal", "");
+            option.selected = requestedSet.has(journal) || (requestedSet.size === 0 && journal === "main.journal");
+            journalSelect.appendChild(option);
+          });
+
+          if (!journalSelect.selectedOptions.length) {
+            const defaultOption = journalSelect.querySelector('option[value="main.journal"]');
+            if (defaultOption) defaultOption.selected = true;
+          }
+
+          reportsState.selectedJournals = Array.from(journalSelect.selectedOptions).map((option) => option.value);
+          if (!reportsState.selectedJournals.length) {
+            reportsState.selectedJournals = ["main.journal"];
+          }
+          syncSelectedJournalsInput();
+          updateIncludedJournals();
+          journalSelect.addEventListener("change", () => {
+            syncSelectedJournalsInput();
+            applyJournals();
+          });
+
+          if (journalToggle) {
+            journalToggle.addEventListener("click", () => {
+              const isHidden = journalSelect.style.display === "none";
+              journalSelect.style.display = isHidden ? "inline" : "none";
+            });
+          }
+
+          document.addEventListener("click", (event) => {
+            const toggleContainsTarget = journalToggle && journalToggle.contains(event.target);
+            const selectContainsTarget = journalSelect && journalSelect.contains(event.target);
+            if (!toggleContainsTarget && !selectContainsTarget) {
+              journalSelect.style.display = "none";
+            }
+          });
+
+          await loadBalances();
+        } catch (error) {
+          console.error("Failed to initialize report leftbar:", error);
+          reportsState.selectedJournals = ["main.journal"];
+          updateIncludedJournals();
+          if (accountContainer) {
+            accountContainer.innerHTML = '<p class="chart-empty">Balances unavailable.</p>';
+          }
+        }
+      };
+
+      initReportLeftbar();
+    })();
   </script>
 </body>
 </html>
