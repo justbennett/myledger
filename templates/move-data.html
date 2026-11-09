@@ -16,7 +16,7 @@
 <html>
 <head>
   <title>Hledger {{title}}</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=9">
+  <link rel="stylesheet" href="/static/css/main.css?v=10">
   <link rel="icon" type="image/png" href="/static/favicon.ico">
 </head>
 <body data-page="move-data">
@@ -106,17 +106,24 @@
         {% include '/components/footer.html' %}
     <!-- Center the update section-->
     <div style="display: flex; justify-content: center;">
-        <div id="update-section">
-      
-      <center><b >Updates</b></center>
-      <pre id="remote-version" style="white-space: pre; margin: 0;">Checking Versions...</pre>
-      <pre id="current-version" style="white-space: pre; margin: 0;"></pre>
-      <p id="update-status" role="status" aria-live="polite"></p>
-
-      <button id="update-my-ledger" class="dark" type="button" hidden>
-        Update App
-      </button>
-    </div>
+      <div id="update-section">
+        <div class="update-box" aria-labelledby="github-update-title">
+          <center><b id="github-update-title">GitHub</b></center>
+          <pre id="remote-version" style="margin: 0;">Checking Versions...</pre>
+          <pre id="current-version" style="margin: 0;"></pre>
+          <p id="update-status" role="status" aria-live="polite"></p>
+          <button id="update-my-ledger" class="dark" type="button" hidden>
+            Update App
+          </button>
+        </div>
+        <div class="update-box" aria-labelledby="data-repository-title">
+          <center><b id="data-repository-title">Data</b></center>
+          <pre id="data-repository-branch" style="margin: 0;"></pre>
+          <pre id="data-repository-commits" style="margin: 0;"></pre>
+          <p id="data-repository-status" role="status" aria-live="polite">Checking repository status...</p>
+          <pre id="data-repository-changes" style="margin: 0;"></pre>
+        </div>
+      </div>
     </div>
 
  
@@ -190,6 +197,6 @@
     </dialog>
 
     <script src="/static/js/journal-table.js?v=1"></script>
-    <script src="/static/js/move-data.js?v=13"></script>
+    <script src="/static/js/move-data.js?v=14"></script>
 </body>
 </html>

@@ -947,6 +947,195 @@ def logout(request: Request):
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
 
+
+# =========================
+# Data repository status
+# =========================
+
+@app.get("/data-git-status", summary="Check financial data repository status")
+def data_git_status():
+    repo = LEDGER_DATA_DIR
+
+    def git(*args):
+        return subprocess.run(
+            ["git", "-C", str(repo), *args],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+    try:
+        # Verify this is a Git repository.
+        result = git("rev-parse", "--show-toplevel")
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "Data directory is not a Git repository.")
+
+        # Identify the current branch.
+        result = git("branch", "--show-current")
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip())
+        branch = result.stdout.strip()
+
+        # Refresh remote-tracking information without changing working files.
+        result = git("fetch", "origin")
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "Unable to fetch origin.")
+
+        # Check for uncommitted changes.
+        result = git("status", "--porcelain")
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip())
+        changes = result.stdout.strip().splitlines()
+
+        # Compare local commits with the production remote.
+        result = git("rev-list", "--left-right", "--count", f"HEAD...origin/{branch}")
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "Unable to compare repository versions.")
+
+        ahead, behind = map(int, result.stdout.split())
+
+        if ahead and behind:
+            status = "diverged"
+        elif ahead:
+            status = "ahead"
+        elif behind:
+            status = "behind"
+        elif changes:
+            status = "local_changes"
+        else:
+            status = "up_to_date"
+
+        return {
+            "available": True,
+            "branch": branch,
+            "status": status,
+            "working_changes": changes,
+            "ahead": ahead,
+            "behind": behind,
+            "message": {
+                "diverged": "Local and production repositories have diverged.",
+                "ahead": "Local repository has commits not on production.",
+                "behind": "Production has commits not in the local repository.",
+                "local_changes": "Uncommitted local changes are present.",
+                "up_to_date": "Repository is up to date.",
+            }[status],
+        }
+
+    except Exception as error:
+        return {
+            "available": False,
+            "status": "error",
+            "message": str(error),
+        }
+
+
+@app.post("/data-git-push", summary="Push production financial data")
+def data_git_push():
+    if os.environ.get("MYLEDGER_DATA_PUSH_ENABLED", "").lower() != "true":
+        raise HTTPException(
+            status_code=403,
+            detail="Data pushing is not enabled in this environment.",
+        )
+
+    repo = LEDGER_DATA_DIR
+
+    def git(*args):
+        return subprocess.run(
+            ["git", "-C", str(repo), *args],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def check(result, action):
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip()
+            raise HTTPException(
+                status_code=500,
+                detail=f"{action} failed: {detail}",
+            )
+
+    try:
+        # Verify the expected branch.
+        result = git("branch", "--show-current")
+        check(result, "Checking branch")
+
+        if result.stdout.strip() != "main":
+            raise HTTPException(
+                status_code=409,
+                detail="Push refused: production data repository is not on main.",
+            )
+
+        # Refresh remote-tracking information.
+        result = git("fetch", "origin")
+        check(result, "Fetching remote")
+
+        # Refuse to push if production is behind or diverged.
+        result = git("rev-list", "--left-right", "--count", "HEAD...origin/main")
+        check(result, "Comparing repositories")
+
+        ahead, behind = map(int, result.stdout.split())
+
+        if behind > 0:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Push refused: production is behind origin/main by "
+                    f"{behind} commit(s). Resolve this manually before pushing."
+                ),
+            )
+
+        # Check for uncommitted changes.
+        result = git("status", "--porcelain")
+        check(result, "Checking working tree")
+        changes = result.stdout.strip()
+
+        committed = False
+
+        if changes:
+            # Stage changes only inside the financial data repository.
+            result = git("add", "-A")
+            check(result, "Staging data changes")
+
+            result = git(
+                "commit",
+                "-m",
+                f"Production data update {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            )
+            check(result, "Committing data changes")
+            committed = True
+
+        # Nothing new to publish.
+        if not committed and ahead == 0:
+            return {
+                "success": True,
+                "message": "Production data is already up to date. Nothing to push.",
+                "committed": False,
+            }
+
+        # Push explicitly to main. No force push.
+        result = git("push", "origin", "main")
+        check(result, "Pushing production data")
+
+        return {
+            "success": True,
+            "message": "Production data successfully pushed to the repository.",
+            "committed": committed,
+        }
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(
+            status_code=504,
+            detail="Git operation timed out.",
+        )
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unable to push production data: {error}",
+        )
+
 # =========================
 # Update and deployment helpers
 # =========================

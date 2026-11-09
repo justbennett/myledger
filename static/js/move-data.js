@@ -639,6 +639,41 @@ async function checkForUpdates() {
   }
 }
 
+async function checkDataRepositoryStatus() {
+  const branch = document.getElementById('data-repository-branch');
+  const commits = document.getElementById('data-repository-commits');
+  const status = document.getElementById('data-repository-status');
+  const changes = document.getElementById('data-repository-changes');
+
+  try {
+    const response = await fetch('/data-git-status');
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.detail || 'Unable to check data repository status');
+    }
+
+    if (!result.available) {
+      status.textContent = result.message || 'Data repository status is unavailable.';
+      return;
+    }
+
+    branch.textContent = `Branch: ${result.branch}`;
+    commits.textContent =
+      `${result.ahead} local commit(s) ahead; ${result.behind} commit(s) behind production.`;
+    status.textContent = result.message;
+    changes.textContent = result.working_changes.length
+      ? `Working tree changes:\n${result.working_changes.join('\n')}`
+      : '';
+  } catch (error) {
+    console.error('Data repository status check failed:', error);
+    branch.textContent = '';
+    commits.textContent = '';
+    changes.textContent = '';
+    status.textContent = `Repository status check failed: ${error.message}`;
+  }
+}
+
 document.getElementById('update-my-ledger')?.addEventListener(
   'click',
   async () => {
@@ -732,4 +767,5 @@ document.addEventListener('DOMContentLoaded', function() {
   loadFileList('rules', 'rules-select');
   loadJournalList();
   checkForUpdates();
+  checkDataRepositoryStatus();
 });
