@@ -14,14 +14,9 @@
           </ul>
         </div>
 
-        <label class="theme-picker" for="theme-select">
-          <span>Theme</span>
-          <select id="theme-select" aria-label="Choose a color theme">
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </label>
+        <button type="button" id="theme-toggle" class="theme-toggle" aria-label="Switch to dark mode" title="Switch to dark mode">
+          <span class="theme-icon" aria-hidden="true">☾</span>
+        </button>
       </div>
     </div>
   </header>
@@ -29,52 +24,47 @@
   <script>
     (() => {
       const storageKey = "myledger-theme";
-      const themeSelect = document.getElementById("theme-select");
+      const themeToggle = document.getElementById("theme-toggle");
+      const themeIcon = themeToggle ? themeToggle.querySelector(".theme-icon") : null;
 
       const getStoredTheme = () => {
         try {
-          return localStorage.getItem(storageKey) || "system";
+          return localStorage.getItem(storageKey) || "light";
         } catch (error) {
-          return "system";
+          return "light";
         }
       };
 
       const applyTheme = (theme) => {
-        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-        const selectedTheme = theme === "dark" || (theme === "system" && prefersDark) ? "dark" : "light";
-        document.body.dataset.theme = selectedTheme;
+        const nextTheme = theme === "dark" ? "dark" : "light";
+        document.body.dataset.theme = nextTheme;
 
-        if (themeSelect) {
-          themeSelect.value = theme;
+        if (themeIcon) {
+          themeIcon.textContent = nextTheme === "dark" ? "☀" : "☾";
         }
+
+        if (themeToggle) {
+          themeToggle.setAttribute("aria-label", nextTheme === "dark" ? "Switch to light mode" : "Switch to dark mode");
+          themeToggle.title = nextTheme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+        }
+      };
+
+      const toggleTheme = () => {
+        const currentTheme = document.body.dataset.theme === "dark" ? "dark" : "light";
+        const nextTheme = currentTheme === "dark" ? "light" : "dark";
+        try {
+          localStorage.setItem(storageKey, nextTheme);
+        } catch (error) {
+          // Ignore storage access errors and fall back to the current browser preference.
+        }
+        applyTheme(nextTheme);
       };
 
       const initialTheme = getStoredTheme();
       applyTheme(initialTheme);
 
-      if (themeSelect) {
-        themeSelect.addEventListener("change", (event) => {
-          const nextTheme = event.target.value;
-          try {
-            localStorage.setItem(storageKey, nextTheme);
-          } catch (error) {
-            // Ignore storage access errors and fall back to the current browser preference.
-          }
-          applyTheme(nextTheme);
-        });
-      }
-
-      const systemPreference = window.matchMedia("(prefers-color-scheme: dark)");
-      const syncSystemTheme = () => {
-        if (getStoredTheme() === "system") {
-          applyTheme("system");
-        }
-      };
-
-      if (typeof systemPreference.addEventListener === "function") {
-        systemPreference.addEventListener("change", syncSystemTheme);
-      } else if (typeof systemPreference.addListener === "function") {
-        systemPreference.addListener(syncSystemTheme);
+      if (themeToggle) {
+        themeToggle.addEventListener("click", toggleTheme);
       }
     })();
   </script>

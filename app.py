@@ -485,9 +485,15 @@ def build_hledger_chart_payload(form_data, chart_type):
         raw_dates = payload.get("prDates", [])
         labels = []
         for group in raw_dates:
-            for entry in group if isinstance(group, list) else [group]:
+            entries = group if isinstance(group, list) else [group]
+            candidates = []
+            for entry in entries:
                 if isinstance(entry, dict):
-                    labels.append(entry.get("contents") or "")
+                    value = (entry.get("contents") or "").strip()
+                    if value:
+                        candidates.append(value)
+            if candidates:
+                labels.append(candidates[-1])
         series = []
         for row in payload.get("prRows", []):
             name = row.get("prrName")

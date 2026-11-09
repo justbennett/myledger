@@ -19,17 +19,11 @@ The main dashboard provides:
 * Journal transaction view
 * Register view
 * Download selected journals as a plain-text file
-* Charts for:
-
-  * Expenses
-  * Income
-  * Assets
-  * Liabilities
-* Bar and pie charts
-* Grouping by month or account
 * Account filtering
 * Journal search/query support
 * Expandable transaction details
+
+Charts are available on the Reports page.
 
 ### Journal Editing
 
@@ -356,15 +350,9 @@ The frontend uses:
 * CSS
 * Vanilla JavaScript
 * Jinja2 templates
-* Chart.js
+* Chart.js for Reports page charts
 
 There is no frontend build system or JavaScript package manager required by the current project.
-
-Chart.js is included in the repository under:
-
-```text
-static/js/vendor/
-```
 
 ### Frontend Structure
 
@@ -373,7 +361,6 @@ Jinja page templates are in `templates/`. Shared dashboard and page fragments ar
 ```text
 templates/
 ├── components/
-│   ├── charts.html
 │   ├── footer.html
 │   ├── header.html
 │   ├── journal.html
@@ -397,6 +384,7 @@ static/
 ```
 
 `app.js` and `move-data.js` contain page-specific behavior. The shared `journal-table.js` renderer is loaded by both pages that display the journal table.
+The Reports page loads the locally hosted Chart.js bundle for its bar and pie charts.
 
 ---
 
@@ -457,4 +445,4 @@ See [`LICENSE`](LICENSE) for the complete license text.
 
 MyLedger is built around [hledger](https://hledger.org/), which provides the accounting engine, journal processing, reporting, and CSV import functionality.
 
-Charting is provided by [Chart.js](https://www.chartjs.org/).
+Reports page charts are rendered with [Chart.js](https://www.chartjs.org/), using the locally hosted bundle in `static/js/vendor/`.

@@ -1,7 +1,6 @@
 <section id="main-view">
       <div class="journal-view-tabs" role="tablist" aria-label="Main views">
         <button type="button" id="journal-view-tab" class="journal-view-tab active" role="tab" aria-selected="true" aria-controls="journal-table-panel" tabindex="0">Journal</button>
-        <button type="button" id="charts-view-tab" class="journal-view-tab" role="tab" aria-selected="false" aria-controls="charts-panel" tabindex="-1">Charts</button>
         <button type="button" id="register-view-tab" class="journal-view-tab" role="tab" aria-selected="false" aria-controls="register-panel" tabindex="-1">Register</button>
       </div>
       <span id="journal-loading" class="loading hidden"></span>
@@ -22,8 +21,6 @@
       <a href="#" class="clear-filter">clear filter</a>
       <!--Journal Panel-->
       {% include '/components/journal.html' with context %}
-      <!--Charts Panel-->
-      {% include '/components/charts.html' with context %}
       <!--Register Panel-->
       {% include '/components/register.html' with context %}
       <div id="download">

@@ -21,7 +21,6 @@ myledger/
 ├── app.py
 ├── templates/
 │   ├── components/
-│   │   ├── charts.html
 │   │   ├── footer.html
 │   │   ├── header.html
 │   │   ├── journal.html

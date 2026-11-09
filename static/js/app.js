@@ -6,9 +6,6 @@ let currentAccountFilter = null;
 let currentJournalSearch = "";
 let activeJournalEdit = null;
 let journalEditorMode = "edit";
-let currentJournalTransactions = [];
-let activeJournalView = "journal";
-let journalChart = null;
 
 let debugMode = false; //set to true to enable debug logging
 
@@ -50,29 +47,6 @@ const journalDataService = {
     return response.json();
   },
 };
-
-const journalCharting = {
-  amountsForClass(transactions) {
-    const accountClass = document.getElementById("chart-account-class").value.toLowerCase();
-    const amounts = [];
-    for (const transaction of transactions) {
-      for (const posting of transaction.postings) {
-        const account = posting.account || "";
-        if (account.split(":", 1)[0].toLowerCase() !== accountClass) continue;
-        for (const amount of posting.amount) {
-          amounts.push({
-            date: transaction.date,
-            account,
-            commodity: amount.commodity || "(no commodity)",
-            quantity: Number(amount.quantity),
-          });
-        }
-      }
-    }
-    return amounts.filter((amount) => Number.isFinite(amount.quantity));
-  },
-};
-
 
   // Toggle visibility
   const toggle = document.getElementById('journal-toggle');
@@ -244,7 +218,6 @@ async function loadJournal(filters = {}) {
   try {
     if (debugMode) console.log("Loading journal with params:", filters);
     const data = await journalDataService.fetchJournal(filters);
-    currentJournalTransactions = data;
 
     const tbody = document.querySelector("#journal-table tbody");
     tbody.innerHTML = "";
@@ -252,11 +225,8 @@ async function loadJournal(filters = {}) {
     for (const tx of data) {
       tbody.appendChild(renderJournalRow(tx));
     }
-    if (activeJournalView === "charts") updateJournalChart();
   } catch (e) {
     console.error("Failed to load journal:", e);
-    currentJournalTransactions = [];
-    if (activeJournalView === "charts") updateJournalChart();
   } finally {
     setLoading(false);
   }
@@ -537,8 +507,7 @@ document.getElementById("journal-editor-form").addEventListener("submit", async 
 });
 
 function setJournalView(view) {
-  activeJournalView = view;
-  const views = ["journal", "charts", "register"];
+  const views = ["journal", "register"];
   for (const candidate of views) {
     const selected = candidate === view;
     const tab = document.getElementById(`${candidate}-view-tab`);
@@ -548,23 +517,20 @@ function setJournalView(view) {
     const panelId = candidate === "journal" ? "journal-table-panel" : `${candidate}-panel`;
     document.getElementById(panelId).hidden = !selected;
   }
-  if (view === "charts") updateJournalChart();
   if (view === "register") loadRegister(currentAccountFilter);
 }
 
 document.getElementById("journal-view-tab").addEventListener("click", () => setJournalView("journal"));
-document.getElementById("charts-view-tab").addEventListener("click", () => setJournalView("charts"));
 document.getElementById("register-view-tab").addEventListener("click", () => setJournalView("register"));
 
 for (const [tab, view] of [
   [document.getElementById("journal-view-tab"), "journal"],
-  [document.getElementById("charts-view-tab"), "charts"],
   [document.getElementById("register-view-tab"), "register"],
 ]) {
   tab.addEventListener("keydown", (event) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
-    const views = ["journal", "charts", "register"];
+    const views = ["journal", "register"];
     const currentIndex = views.indexOf(view);
     const nextIndex = event.key === "Home" ? 0
       : event.key === "End" ? views.length - 1
@@ -572,153 +538,6 @@ for (const [tab, view] of [
     const nextView = views[nextIndex];
     setJournalView(nextView);
     document.getElementById(`${nextView}-view-tab`).focus();
-  });
-}
-
-for (const controlId of ["chart-type", "chart-account-class", "chart-grouping", "chart-commodity"]) {
-  document.getElementById(controlId).addEventListener("change", updateJournalChart);
-}
-
-function chartAmountsForClass() {
-  return journalCharting.amountsForClass(currentJournalTransactions);
-}
-
-function updateJournalChart() {
-  const status = document.getElementById("chart-status");
-  const container = document.getElementById("chart-container");
-  const excludedContainer = document.getElementById("chart-excluded");
-  const excludedList = document.getElementById("chart-excluded-list");
-  const commodityControl = document.getElementById("chart-commodity-control");
-  const commoditySelect = document.getElementById("chart-commodity");
-  const type = document.getElementById("chart-type").value;
-  const accountClass = document.getElementById("chart-account-class").value.toLowerCase();
-  const amounts = chartAmountsForClass();
-  const commodities = [...new Set(amounts.map((amount) => amount.commodity))].sort();
-  const previousCommodity = commoditySelect.value;
-
-  commoditySelect.replaceChildren(...commodities.map((commodity) => {
-    const option = document.createElement("option");
-    option.value = commodity;
-    option.textContent = commodity;
-    return option;
-  }));
-  commodityControl.hidden = commodities.length < 2;
-  if (commodities.includes(previousCommodity)) commoditySelect.value = previousCommodity;
-
-  if (journalChart) {
-    journalChart.destroy();
-    journalChart = null;
-  }
-  excludedContainer.hidden = true;
-  excludedList.replaceChildren();
-
-  const commodity = commoditySelect.value;
-  const selectedAmounts = amounts.filter((amount) => amount.commodity === commodity);
-  if (!selectedAmounts.length) {
-    container.hidden = true;
-    status.textContent = amounts.length
-      ? "No postings for this commodity."
-      : "No postings match this account class and filter.";
-    return;
-  }
-
-  const grouping = document.getElementById("chart-grouping").value;
-  const totals = new Map();
-  for (const amount of selectedAmounts) {
-    const label = grouping === "month" ? amount.date.slice(0, 7) : amount.account;
-    totals.set(label, (totals.get(label) || 0) + amount.quantity);
-  }
-
-  let chartEntries = [...totals].map(([label, total]) => ({
-    label,
-    value: type === "pie" && accountClass === "income" ? -total : total,
-  }));
-  let excludedEntries = [];
-  if (type === "pie") {
-    excludedEntries = chartEntries.filter((entry) => entry.value < 0)
-      .sort((left, right) => left.label.localeCompare(right.label));
-    chartEntries = chartEntries.filter((entry) => entry.value > 0);
-    if (excludedEntries.length) {
-      excludedList.replaceChildren(...excludedEntries.map((entry) => {
-        const item = document.createElement("li");
-        item.textContent = `${entry.label}: ${commodity} ${entry.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-        return item;
-      }));
-      excludedContainer.hidden = false;
-    }
-  }
-
-  if (grouping === "account" && chartEntries.length > 12) {
-    const ranked = chartEntries
-      .sort((left, right) => Math.abs(right.value) - Math.abs(left.value));
-    const leading = ranked.slice(0, 11);
-    const remainder = ranked.slice(11).reduce((sum, item) => sum + item.value, 0);
-    chartEntries = leading.concat({ label: "Other accounts", value: remainder });
-  } else {
-    chartEntries.sort((left, right) => left.label.localeCompare(right.label));
-  }
-
-  if (!chartEntries.length) {
-    container.hidden = true;
-    status.textContent = type === "pie" && excludedEntries.length
-      ? "No positive net values to chart."
-      : "No non-zero values to chart.";
-    return;
-  }
-
-  const labels = chartEntries.map((entry) => entry.label);
-  const values = chartEntries.map((entry) => entry.value);
-
-  const palette = ["#167d75", "#e07a5f", "#377eb8", "#e3a008", "#795548", "#7b61a8", "#4d9f70", "#d1495b", "#54717a", "#d17cbd", "#8c8f2f", "#6674a6"];
-  const chartData = type === "pie"
-    ? {
-        labels,
-        datasets: [{
-          data: values,
-          backgroundColor: labels.map((_, index) => palette[index % palette.length]),
-          borderColor: "#fff",
-          borderWidth: 2,
-        }],
-      }
-    : {
-        labels,
-        datasets: [{
-          label: commodity,
-          data: values,
-          backgroundColor: "#167d75",
-          borderColor: "#0f625c",
-          borderWidth: 1,
-        }],
-      };
-
-  container.hidden = false;
-  status.textContent = type === "pie"
-    ? `Showing net values in ${commodity}${accountClass === "income" ? " with income signs reversed" : ""}.`
-    : `Signed posting amounts in ${commodity}.`;
-  journalChart = new Chart(document.getElementById("journal-chart"), {
-    type,
-    data: chartData,
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: type === "pie", position: "bottom" },
-        tooltip: {
-          callbacks: {
-            label(context) {
-              const value = type === "pie" ? values[context.dataIndex] : context.parsed.y;
-              return `${context.label}: ${commodity} ${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-            },
-          },
-        },
-      },
-      ...(type === "bar" ? {
-        scales: {
-          x: { grid: { display: false } },
-          y: { beginAtZero: true, title: { display: true, text: commodity } },
-        },
-      } : {}),
-    },
   });
 }
 

@@ -7,13 +7,14 @@
 {% set subtitle = "Generate custom reports from your ledger data." %}
 {% set links = [
     {"href": "/", "text": "Dashboard"},
+    {"href": "/move-data", "text": "Data Manager"},
     {"href": "/logout", "text": "Logout"}
 ] %}
 
 <html>
 <head>
   <title>Hledger {{ title }}</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=11">
+  <link rel="stylesheet" href="/static/css/main.css?v=12">
   <link rel="icon" type="image/png" href="/static/favicon.ico">
 </head>
 <body data-page="reports">
@@ -182,6 +183,12 @@
                 <option value="pie">Pie</option>
               </select>
             </label>
+            <label class="checkbox-field compact-checkbox-field" style="display:flex; align-items:center; gap:0.5rem; min-height:auto;">
+              <input type="checkbox" id="report-chart-sign-reverse" aria-label="Reverse chart sign">
+              <span class="checkbox-copy">
+                <span class="checkbox-label">Reverse sign</span>
+              </span>
+            </label>
             <button type="button" id="generate-report-chart" class="dark small-button">Generate chart</button>
           </div>
           <div id="report-chart-area" class="report-chart-area" aria-live="polite"></div>
@@ -213,17 +220,21 @@
     </form>
   </dialog>
 
+  <script src="/static/js/vendor/chart.umd.min.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const reportForm = document.querySelector("form.reports-form");
       const reportCommandInput = document.getElementById("report-command-input");
       const chartPanel = document.getElementById("report-chart-panel");
       const chartTypeSelect = document.getElementById("report-chart-type");
+      const chartSignReverse = document.getElementById("report-chart-sign-reverse");
       const chartArea = document.getElementById("report-chart-area");
       const generateChartButton = document.getElementById("generate-report-chart");
       const chartableReportTypes = new Set(["balance", "cashflow"]);
       const reportTabs = document.querySelectorAll(".journal-view-tab");
       const tabPanels = document.querySelectorAll(".reports-tab-panel");
+      const chartPalette = ["#167d75", "#3b82f6", "#f59e0b", "#8b5cf6", "#ef4444"];
+      let reportChart = null;
 
       const showTab = (tabName) => {
         reportTabs.forEach((tab) => {
@@ -238,6 +249,11 @@
           panel.hidden = !active;
           panel.classList.toggle("active", active);
         });
+        if (tabName === "chart" && reportChart) {
+          requestAnimationFrame(() => {
+            if (reportChart) reportChart.resize();
+          });
+        }
       };
 
       reportTabs.forEach((tab) => {
@@ -245,6 +261,48 @@
       });
 
       const sanitizeValue = (value) => value === null || value === undefined ? "" : String(value);
+      const formatChartValue = (value) => {
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return value;
+        const abs = Math.abs(numeric);
+        const sign = numeric < 0 ? "-" : "";
+        if (abs >= 1000000) return `${sign}$${(abs / 1000000).toFixed(2)}M`;
+        if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(2)}K`;
+        if (Number.isInteger(numeric)) return `${sign}$${abs.toFixed(0)}`;
+        return `${sign}$${abs.toFixed(2)}`;
+      };
+
+      const destroyReportChart = () => {
+        if (!reportChart) return;
+        reportChart.destroy();
+        reportChart = null;
+      };
+
+      const formatXAxisLabel = (label, period) => {
+        const text = String(label || "").trim();
+        if (!text) return "";
+
+        if (period === "monthly") {
+          const directMonth = text.match(/^(\d{4})[-/](\d{1,2})(?:[-/](\d{1,2}))?$/);
+          if (directMonth) {
+            const [, year, month] = directMonth;
+            const date = new Date(Number(year), Number(month) - 1, 1);
+            return new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" }).format(date).replace("’", "'")
+              .replace(/\s+/, " ");
+          }
+
+          const monthOnly = text.match(/^[A-Za-z]{3,9}\s*['’]?\d{2}$/i);
+          if (monthOnly) return text;
+
+          const alt = new Date(text);
+          if (!Number.isNaN(alt.getTime())) {
+            return new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit" }).format(alt).replace("’", "'");
+          }
+        }
+
+        if (text.length <= 10) return text;
+        return text.slice(0, 10);
+      };
 
       const chartAvailability = () => {
         if (!reportForm) return false;
@@ -267,6 +325,7 @@
           chartTab.style.opacity = available ? "1" : "0.5";
         }
         if (!available) {
+          destroyReportChart();
           chartArea.innerHTML = "";
           return;
         }
@@ -287,100 +346,96 @@
             chartTypeSelect.value = "bar";
           }
         }
+
+        if (chartSignReverse) {
+          chartSignReverse.disabled = chartTypeSelect.value === "pie";
+        }
       };
 
-      const renderPieChart = (series) => {
-        if (!series || series.length === 0) {
-          chartArea.innerHTML = '<p class="chart-empty">No data available for a pie chart.</p>';
+      const renderChart = (data) => {
+        const isPie = data.chart_type === "pie";
+        const sourceSeries = data.series || [];
+        const labels = isPie
+          ? sourceSeries.map((point) => point.label)
+          : (data.labels || []).map((label) => formatXAxisLabel(label, document.querySelector('select[name="period"]').value));
+        if (!labels.length || !sourceSeries.length) {
+          destroyReportChart();
+          chartArea.innerHTML = `<p class="chart-empty">No data available for this ${isPie ? "pie" : "bar"} chart.</p>`;
           return;
         }
 
-        const total = series.reduce((sum, point) => sum + Math.abs(point.value), 0);
-        const radius = 90;
-        const center = 110;
-        const arcs = [];
-        let startAngle = -Math.PI / 2;
+        destroyReportChart();
+        chartArea.innerHTML = `<div class="report-chart-canvas-container"><canvas id="report-chart-canvas" role="img" aria-label="${isPie ? "Pie chart" : "Bar chart"}"></canvas></div>`;
+        const canvas = document.getElementById("report-chart-canvas");
+        const textColor = getComputedStyle(document.documentElement).getPropertyValue("--theme-navy").trim();
+        const mutedColor = getComputedStyle(document.documentElement).getPropertyValue("--theme-muted-slate").trim();
+        const gridColor = getComputedStyle(document.documentElement).getPropertyValue("--theme-border").trim();
+        const datasets = isPie
+          ? [{
+              data: sourceSeries.map((point) => Math.abs(Number(point.value) || 0)),
+              backgroundColor: sourceSeries.map((_, index) => chartPalette[index % chartPalette.length]),
+              borderColor: getComputedStyle(document.documentElement).getPropertyValue("--theme-surface").trim(),
+              borderWidth: 2,
+            }]
+          : sourceSeries.map((item, index) => ({
+              label: item.label,
+              data: labels.map((_, valueIndex) => {
+                const value = Number((item.values || [])[valueIndex]);
+                if (!Number.isFinite(value)) return null;
+                return chartSignReverse && chartSignReverse.checked ? -value : value;
+              }),
+              backgroundColor: item.color || chartPalette[index % chartPalette.length],
+              borderColor: item.color || chartPalette[index % chartPalette.length],
+              borderWidth: 1,
+            }));
 
-        series.forEach((point) => {
-          const slice = (Math.abs(point.value) / total) * Math.PI * 2;
-          const endAngle = startAngle + slice;
-          const x1 = center + Math.cos(startAngle) * radius;
-          const y1 = center + Math.sin(startAngle) * radius;
-          const x2 = center + Math.cos(endAngle) * radius;
-          const y2 = center + Math.sin(endAngle) * radius;
-          const largeArc = slice > Math.PI ? 1 : 0;
-          const path = `M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
-          arcs.push(`<path d="${path}" fill="${point.color || '#167d75'}" stroke="#fff" stroke-width="1"></path>`);
-          startAngle = endAngle;
+        reportChart = new Chart(canvas, {
+          type: isPie ? "pie" : "bar",
+          data: { labels, datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            color: textColor,
+            plugins: {
+              legend: {
+                display: isPie || sourceSeries.length > 1,
+                position: "bottom",
+                labels: { color: textColor },
+              },
+              tooltip: {
+                callbacks: {
+                  label(context) {
+                    if (isPie) {
+                      return `${context.label}: ${formatChartValue(sourceSeries[context.dataIndex].value)}`;
+                    }
+                    return `${context.dataset.label}: ${formatChartValue(context.parsed.y)}`;
+                  },
+                },
+              },
+            },
+            ...(isPie ? {} : {
+              scales: {
+                x: {
+                  grid: { display: false },
+                  ticks: {
+                    color: mutedColor,
+                    autoSkip: true,
+                    maxRotation: 45,
+                    minRotation: 0,
+                  },
+                },
+                y: {
+                  beginAtZero: true,
+                  grid: { color: gridColor },
+                  ticks: {
+                    color: mutedColor,
+                    callback: (value) => formatChartValue(value),
+                  },
+                },
+              },
+            }),
+          },
         });
-
-        const legend = series.map((point) => `<div class="chart-legend-item"><span class="legend-swatch" style="background:${point.color || '#167d75'}"></span>${point.label}: ${point.value.toFixed(2)}</div>`).join('');
-        chartArea.innerHTML = `
-          <svg viewBox="0 0 220 220" class="report-chart-svg" role="img" aria-label="Pie chart">
-            ${arcs.join('')}
-            <circle cx="110" cy="110" r="42" fill="#fff"></circle>
-          </svg>
-          <div class="chart-legend">${legend}</div>
-        `;
-      };
-
-      const renderBarChart = (data) => {
-        const labels = data.labels || [];
-        const series = data.series || [];
-        if (!labels.length || !series.length) {
-          chartArea.innerHTML = '<p class="chart-empty">No chart data available for the selected report.</p>';
-          return;
-        }
-
-        const width = 720;
-        const height = 300;
-        const pad = { top: 20, right: 20, bottom: 60, left: 60 };
-        const maxValue = Math.max(...series.flatMap((item) => item.values || [0]), 0);
-        const groupWidth = (width - pad.left - pad.right) / labels.length;
-        const innerWidth = width - pad.left - pad.right;
-        const barGap = 8;
-        const barWidth = Math.max(12, Math.min(28, (groupWidth - barGap) / Math.max(series.length, 1)));
-
-        const axis = `
-          <line x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" stroke="#475569" />
-          <line x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" stroke="#475569" />
-        `;
-
-        const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-          const y = height - pad.bottom - (height - pad.top - pad.bottom) * ratio;
-          return `<line x1="${pad.left}" y1="${y}" x2="${width - pad.right}" y2="${y}" stroke="#e2e8f0" />`;
-        }).join('');
-
-        const bars = series.map((item, seriesIndex) => {
-          const values = item.values || [];
-          return values.map((value, index) => {
-            const xBase = pad.left + (index * groupWidth) + (seriesIndex * barWidth) + 6;
-            const barHeight = ((Math.abs(value) / Math.max(maxValue, 1)) * (height - pad.top - pad.bottom));
-            const yBase = height - pad.bottom;
-            const y = value >= 0 ? yBase - barHeight : yBase;
-            const finalHeight = value >= 0 ? barHeight : Math.abs(barHeight);
-            return `
-              <rect x="${xBase}" y="${y}" width="${Math.max(8, barWidth - 4)}" height="${finalHeight}" fill="${item.color || ['#167d75', '#3b82f6', '#f59e0b', '#8b5cf6'][seriesIndex % 4]}" rx="2"></rect>
-            `;
-          }).join('');
-        }).join('');
-
-        const labelsMarkup = labels.map((label, index) => {
-          const x = pad.left + index * groupWidth + groupWidth / 2;
-          return `<text x="${x}" y="${height - 18}" text-anchor="middle" font-size="10">${label.slice(0, 8)}</text>`;
-        }).join('');
-
-        const legend = series.map((item, index) => `<div class="chart-legend-item"><span class="legend-swatch" style="background:${item.color || ['#167d75', '#3b82f6', '#f59e0b', '#8b5cf6'][index % 4]}"></span>${item.label}</div>`).join('');
-
-        chartArea.innerHTML = `
-          <svg viewBox="0 0 ${width} ${height}" class="report-chart-svg" role="img" aria-label="Bar chart">
-            ${axis}
-            ${yTicks}
-            ${bars}
-            ${labelsMarkup}
-          </svg>
-          <div class="chart-legend">${legend}</div>
-        `;
       };
 
       const fetchChartData = async () => {
@@ -415,6 +470,7 @@
           chart_type: chartType,
         });
 
+        destroyReportChart();
         chartArea.innerHTML = '<div class="loading">Loading chart...</div>';
 
         try {
@@ -424,13 +480,9 @@
             throw new Error(detail || `HTTP ${response.status}`);
           }
           const payload = await response.json();
-          if (payload.chart_type === 'pie') {
-            const colored = (payload.series || []).map((point, index) => ({ ...point, color: ['#167d75', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444'][index % 5] }));
-            renderPieChart(colored);
-          } else {
-            renderBarChart(payload);
-          }
+          renderChart(payload);
         } catch (error) {
+          destroyReportChart();
           chartArea.innerHTML = `<p class="chart-empty">Chart unavailable: ${sanitizeValue(error.message)}</p>`;
         }
       };
@@ -580,12 +632,20 @@
         chartTypeSelect.addEventListener("change", syncChartControls);
       }
 
+      if (chartSignReverse) {
+        chartSignReverse.addEventListener("change", () => {
+          if (chartTypeSelect && chartTypeSelect.value === "bar") {
+            fetchChartData();
+          }
+        });
+      }
+
       if (generateChartButton) {
         generateChartButton.addEventListener("click", fetchChartData);
       }
 
       syncChartControls();
-      if (chartPanel && !chartPanel.hidden) {
+      if (chartPanel && !chartPanel.hidden && chartAvailability()) {
         fetchChartData();
       }
 
