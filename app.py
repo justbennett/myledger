@@ -24,6 +24,7 @@ import os
 import re
 import shlex
 import tempfile
+import threading
 from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
@@ -62,6 +63,7 @@ LEDGER_DATA_DIR = Path(os.environ.get("MYLEDGER_DATA_DIR", "."))
 JOURNAL_DIR = LEDGER_DATA_DIR / "journals"
 RULES_DIR = LEDGER_DATA_DIR / "rules"
 JOURNAL = str(JOURNAL_DIR / "main.journal")
+journal_mutation_lock = threading.RLock()
 
 # =========================
 # App setup and configuration
@@ -104,9 +106,11 @@ def append_account_and_query(args, account, query):
     if query:
         append_query_terms(args, query)
 
-def build_register_transactions(rows, account_filter=None):
+def build_register_transactions(rows, transaction_metadata=None):
+    transaction_metadata = transaction_metadata or {}
     grouped = group_register_rows(rows)
     transactions = []
+    matched_metadata = set()
 
     for txid, tx_rows in grouped.items():
         # Use first row for shared fields
@@ -125,7 +129,14 @@ def build_register_transactions(rows, account_filter=None):
 
         # Choose primary posting
         # Primary posting = the posting for THIS register row
-        primary = row[3]
+        primary = first[3]
+        candidates = transaction_metadata.get((date, description), [])
+        metadata = next(
+            (candidate for candidate in candidates if candidate["id"] not in matched_metadata),
+            {},
+        )
+        if "id" in metadata:
+            matched_metadata.add(metadata["id"])
 
         # Amount from primary posting
         amount = [
@@ -176,8 +187,9 @@ def build_register_transactions(rows, account_filter=None):
 
 
         transactions.append({
-            "id": txid,
-            "status": primary.get("pstatus", "Unmarked"),
+            "id": metadata.get("id", txid),
+            "status": metadata.get("status", "Unmarked"),
+            "edit": metadata.get("edit"),
             "date": date,
             "description": description,
             "account": primary["paccount"],
@@ -225,10 +237,22 @@ def parse_hledger_rows(rows):
 # =========================
 
 def group_register_rows(rows):
-    grouped = defaultdict(list)
+    grouped = {}
+    current_key = None
+    current_txid = None
+
     for row in rows:
         txid = row[3]["ptransaction_"]
-        grouped[txid].append(row)
+        starts_transaction = (
+            current_key is None
+            or txid != current_txid
+            or (row[0] is not None and row[2] is not None)
+        )
+        if starts_transaction:
+            current_key = len(grouped) + 1
+            grouped[current_key] = []
+            current_txid = txid
+        grouped[current_key].append(row)
     return grouped
 
 def get_edit_metadata(tx):
@@ -258,6 +282,17 @@ def get_edit_metadata(tx):
         "original_hash": hashlib.sha256(entry.encode("utf-8")).hexdigest(),
     }
 
+def get_edit_locator(tx):
+    edit = get_edit_metadata(tx)
+    if not edit:
+        return None
+    return {
+        "journal": edit["journal"],
+        "line_start": edit["line_start"],
+        "line_end": edit["line_end"],
+        "original_hash": edit["original_hash"],
+    }
+
 def validate_journal_entry_content(entry):
     if not isinstance(entry, str):
         raise HTTPException(status_code=400, detail="Transaction text is required")
@@ -284,6 +319,272 @@ def validate_journal_entry_content(entry):
     if len(parsed_entries) != 1:
         raise HTTPException(status_code=400, detail="Enter only one transaction at a time")
     return entry
+
+def validate_journal_entries_content(entries):
+    normalized_entries = []
+    for entry in entries:
+        if not isinstance(entry, str):
+            raise HTTPException(status_code=400, detail="Transaction text is required")
+        entry = entry.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
+        if not re.match(r"^\d{4}-\d{2}-\d{2}(?:\s|$)", entry):
+            raise HTTPException(status_code=400, detail="Entry must begin with a dated transaction")
+        normalized_entries.append(entry)
+
+    validation = subprocess.run(
+        ["hledger", "print", "-f", "-", "-O", "json"],
+        input="\n\n".join(normalized_entries),
+        capture_output=True,
+        text=True,
+        errors="replace",
+    )
+    if validation.returncode != 0:
+        raise HTTPException(status_code=400, detail=validation.stderr.strip())
+    try:
+        parsed_entries = json.loads(validation.stdout)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="hledger could not parse the selected entries")
+    if len(parsed_entries) != len(normalized_entries):
+        raise HTTPException(status_code=400, detail="hledger could not parse every selected entry")
+    return normalized_entries
+
+def validate_mutation_tag(tag, *, require_account=False):
+    if not isinstance(tag, dict):
+        raise HTTPException(status_code=400, detail="Tags must include a name and value")
+    name = tag.get("name")
+    value = tag.get("value")
+    if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]*", name):
+        raise HTTPException(status_code=400, detail="Tag names must start with a letter and contain only letters, numbers, underscores, or hyphens")
+    if not isinstance(value, str) or not value.strip() or "\n" in value or "\r" in value:
+        raise HTTPException(status_code=400, detail="Tag values must be non-empty single-line text")
+    result = {"name": name, "value": value.strip()}
+    if require_account:
+        account = tag.get("account")
+        if not isinstance(account, str) or not account.strip():
+            raise HTTPException(status_code=400, detail="Choose the account whose posting should receive the tag")
+        result["account"] = account.strip()
+    return result
+
+def validate_entry_mutations(changes):
+    if not isinstance(changes, dict) or not changes:
+        raise HTTPException(status_code=400, detail="Select at least one change to apply")
+    unknown_fields = set(changes) - {"status", "transaction_tag", "posting_tag", "rename_account"}
+    if unknown_fields:
+        raise HTTPException(status_code=400, detail="Unsupported transaction change")
+
+    validated = {}
+    if "status" in changes:
+        status = changes["status"]
+        if not isinstance(status, str) or status not in {"", "!", "*"}:
+            raise HTTPException(status_code=400, detail="Status must be blank, !, or *")
+        validated["status"] = status
+    if "transaction_tag" in changes:
+        validated["transaction_tag"] = validate_mutation_tag(changes["transaction_tag"])
+    if "posting_tag" in changes:
+        validated["posting_tag"] = validate_mutation_tag(changes["posting_tag"], require_account=True)
+    if "rename_account" in changes:
+        rename = changes["rename_account"]
+        if not isinstance(rename, dict):
+            raise HTTPException(status_code=400, detail="Account rename requires source and destination account names")
+        source = rename.get("from")
+        destination = rename.get("to")
+        if not isinstance(source, str) or not source.strip() or not isinstance(destination, str) or not destination.strip():
+            raise HTTPException(status_code=400, detail="Account rename requires source and destination account names")
+        if "\n" in source or "\r" in source or "\n" in destination or "\r" in destination:
+            raise HTTPException(status_code=400, detail="Account names must be single-line text")
+        if source.strip() == destination.strip():
+            raise HTTPException(status_code=400, detail="Choose a different destination account name")
+        validated["rename_account"] = {"from": source.strip(), "to": destination.strip()}
+    if not validated:
+        raise HTTPException(status_code=400, detail="Select at least one change to apply")
+    return validated
+
+def append_tag_to_journal_line(line, tag, continuation_indent):
+    tag_text = f"{tag['name']}: {tag['value']}"
+    if ";" in line:
+        _, comment = line.split(";", 1)
+        tag_pattern = rf"^\s*{re.escape(tag['name'])}:\s*{re.escape(tag['value'])}\s*$"
+        if re.search(tag_pattern, comment):
+            return line, None
+        return line, f"{continuation_indent}; {tag_text}"
+    return f"{line.rstrip()}  ; {tag_text}", None
+
+def mutate_journal_entry(entry, changes):
+    lines = entry.split("\n")
+    header_match = re.match(r"^(\d{4}-\d{2}-\d{2})[ \t]+(.*)$", lines[0])
+    if not header_match:
+        raise HTTPException(status_code=400, detail="Entry must begin with a dated transaction")
+
+    if "status" in changes:
+        header_rest = header_match.group(2)
+        existing_status = re.match(r"^([*!])(?:[ \t]+|$)", header_rest)
+        if existing_status:
+            header_rest = header_rest[existing_status.end():]
+        status = changes["status"]
+        lines[0] = f"{header_match.group(1)} {status}{' ' if status and header_rest else ''}{header_rest}"
+
+    if "transaction_tag" in changes:
+        lines[0], tag_comment = append_tag_to_journal_line(lines[0], changes["transaction_tag"], "    ")
+        if tag_comment:
+            lines.insert(1, tag_comment)
+
+    for index in range(len(lines) - 1, 0, -1):
+        line = lines[index]
+        if not line[:1].isspace() or not line.strip() or line.lstrip().startswith((";", "#")):
+            continue
+
+        indentation = line[:len(line) - len(line.lstrip())]
+        posting = line[len(indentation):]
+        before_comment, separator, comment = posting.partition(";")
+        amount_separator = re.search(r"[ \t]{2,}", before_comment)
+        account = (before_comment[:amount_separator.start()] if amount_separator else before_comment).rstrip()
+        rest = before_comment[len(account):]
+
+        if "posting_tag" in changes and account == changes["posting_tag"]["account"]:
+            tag = changes["posting_tag"]
+            tagged_line, tag_comment = append_tag_to_journal_line(line, tag, f"{indentation}  ")
+            lines[index] = tagged_line
+            if tag_comment:
+                lines.insert(index + 1, tag_comment)
+            posting = tagged_line[len(indentation):]
+            before_comment, separator, comment = posting.partition(";")
+            amount_separator = re.search(r"[ \t]{2,}", before_comment)
+            account = (before_comment[:amount_separator.start()] if amount_separator else before_comment).rstrip()
+            rest = before_comment[len(account):]
+
+        if "rename_account" in changes and account == changes["rename_account"]["from"]:
+            new_account = changes["rename_account"]["to"]
+            lines[index] = f"{indentation}{new_account}{rest}{';' + comment if separator else ''}"
+
+    return "\n".join(lines)
+
+def entry_contains_posting_account(entry, account_name):
+    for line in entry.split("\n")[1:]:
+        if not line[:1].isspace() or not line.strip() or line.lstrip().startswith((";", "#")):
+            continue
+        posting = line.lstrip().partition(";")[0]
+        amount_separator = re.search(r"[ \t]{2,}", posting)
+        account = (posting[:amount_separator.start()] if amount_separator else posting).rstrip()
+        if account == account_name:
+            return True
+    return False
+
+def resolve_journal_edit_path(journal_name):
+    if not isinstance(journal_name, str):
+        raise HTTPException(status_code=400, detail="Invalid journal path")
+    journal_root = JOURNAL_DIR.resolve()
+    journal_path = (journal_root / journal_name).resolve()
+    try:
+        journal_path.relative_to(journal_root)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid journal path")
+    if not journal_path.is_file():
+        raise HTTPException(status_code=404, detail="Journal file not found")
+    return journal_path
+
+def apply_journal_entry_mutations(items, changes):
+    if not isinstance(items, list) or not items:
+        raise HTTPException(status_code=400, detail="Select at least one transaction")
+    if len(items) > 500:
+        raise HTTPException(status_code=400, detail="Bulk updates are limited to 500 transactions")
+
+    changes = validate_entry_mutations(changes)
+    targets = []
+    seen = set()
+    journal_names = set()
+    for item in items:
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=400, detail="Invalid transaction selection")
+        edit = item.get("edit")
+        if not isinstance(edit, dict):
+            raise HTTPException(status_code=400, detail="A selected transaction cannot be edited")
+        journal_name = edit.get("journal")
+        line_start = edit.get("line_start")
+        line_end = edit.get("line_end")
+        original_hash = edit.get("original_hash")
+        if (
+            not isinstance(line_start, int) or isinstance(line_start, bool) or line_start < 1
+            or not isinstance(line_end, int) or isinstance(line_end, bool) or line_end < line_start
+            or not isinstance(original_hash, str)
+        ):
+            raise HTTPException(status_code=400, detail="Invalid transaction edit metadata")
+        journal_path = resolve_journal_edit_path(journal_name)
+        key = (str(journal_path), line_start, line_end)
+        if key in seen:
+            raise HTTPException(status_code=400, detail="A transaction was selected more than once")
+        seen.add(key)
+        journal_names.add(str(journal_path))
+        targets.append((journal_path, line_start, line_end, original_hash))
+
+    if len(journal_names) != 1:
+        raise HTTPException(status_code=400, detail="Apply a bulk update to transactions from one journal file at a time")
+
+    target_ranges = sorted((line_start, line_end) for _, line_start, line_end, _ in targets)
+    if any(current_start <= previous_end for (_, previous_end), (current_start, _) in zip(target_ranges, target_ranges[1:])):
+        raise HTTPException(status_code=400, detail="Selected transaction source ranges overlap")
+
+    with journal_mutation_lock:
+        journal_path = targets[0][0]
+        with journal_path.open("r", encoding="utf-8", newline="") as journal_file:
+            original_content = journal_file.read()
+        lines = original_content.splitlines(keepends=True)
+        updated_entries = []
+        matched_posting_tags = 0
+        matched_account_renames = 0
+        for _, line_start, line_end, original_hash in sorted(targets, key=lambda target: target[1]):
+            if line_end > len(lines):
+                raise HTTPException(status_code=409, detail="Journal changed; reload before editing")
+            original_entry = "".join(lines[line_start - 1:line_end])
+            normalized_entry = original_entry.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")
+            current_hash = hashlib.sha256(normalized_entry.encode("utf-8")).hexdigest()
+            if not hmac.compare_digest(current_hash, original_hash):
+                raise HTTPException(status_code=409, detail="A selected transaction changed; reload before editing")
+            if "posting_tag" in changes and entry_contains_posting_account(normalized_entry, changes["posting_tag"]["account"]):
+                matched_posting_tags += 1
+            if "rename_account" in changes and entry_contains_posting_account(normalized_entry, changes["rename_account"]["from"]):
+                matched_account_renames += 1
+            updated_entry = mutate_journal_entry(normalized_entry, changes)
+            updated_entries.append((line_start, line_end, updated_entry, original_entry.endswith(("\n", "\r"))))
+
+        if "posting_tag" in changes and not matched_posting_tags:
+            raise HTTPException(status_code=400, detail="The selected transactions do not contain the posting account to tag")
+        if "rename_account" in changes and not matched_account_renames:
+            raise HTTPException(status_code=400, detail="The selected transactions do not contain the account to rename")
+
+        validated_entries = validate_journal_entries_content([entry[2] for entry in updated_entries])
+        updated_entries = [
+            (line_start, line_end, validated_entry, had_trailing_newline)
+            for (line_start, line_end, _, had_trailing_newline), validated_entry
+            in zip(updated_entries, validated_entries)
+        ]
+        newline = "\r\n" if "\r\n" in original_content else "\n"
+        for line_start, line_end, updated_entry, had_trailing_newline in sorted(updated_entries, reverse=True):
+            replacement = updated_entry.replace("\n", newline)
+            if had_trailing_newline:
+                replacement += newline
+            lines[line_start - 1:line_end] = [replacement]
+        updated_content = "".join(lines)
+
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", newline="", dir=journal_path.parent,
+                delete=False,
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
+                temp_file.write(updated_content)
+            with journal_path.open("r", encoding="utf-8", newline="") as journal_file:
+                latest_content = journal_file.read()
+            if not hmac.compare_digest(
+                hashlib.sha256(latest_content.encode("utf-8")).digest(),
+                hashlib.sha256(original_content.encode("utf-8")).digest(),
+            ):
+                raise HTTPException(status_code=409, detail="Journal changed while applying updates; reload before editing")
+            os.replace(temp_path, journal_path)
+        finally:
+            if temp_path and temp_path.exists():
+                temp_path.unlink()
+
+    return {"success": True, "updated": len(updated_entries)}
 
 def resolve_data_file(directory, filename):
     if not isinstance(filename, str) or Path(filename).name != filename:
@@ -876,7 +1177,24 @@ def register(
 
     raw = hledger(args, files)
     rows = json.loads(raw)
-    transactions_out = build_register_transactions(rows, account_filter=account)
+    transaction_args = ["print", "-O", "json"]
+    apply_common_hledger_filters(
+        transaction_args,
+        filters,
+        include_account_query=True,
+        include_tree=False,
+        include_empty=False,
+        include_extra_args=False,
+    )
+    source_transactions = json.loads(hledger(transaction_args, files))
+    transaction_metadata = defaultdict(list)
+    for tx in source_transactions:
+        transaction_metadata[(tx["tdate"], tx["tdescription"])].append({
+            "id": tx["tindex"],
+            "status": tx.get("tstatus", "Unmarked"),
+            "edit": get_edit_locator(tx),
+        })
+    transactions_out = build_register_transactions(rows, transaction_metadata=transaction_metadata)
 
     return transactions_out
 
@@ -1289,6 +1607,7 @@ def journal(
         results.append({
             "date": date,
             "description": desc,
+            "status": tx.get("tstatus", "Unmarked"),
             "comment": tx.get("tcomment", ""),
             "edit": get_edit_metadata(tx),
             "postings": [
@@ -1384,6 +1703,13 @@ async def edit_journal_entry(request: Request):
             temp_path.unlink()
 
     return {"success": True}
+
+@app.post("/journal/mutate", summary="Apply structured changes to journal transactions")
+async def mutate_journal_entries(request: Request):
+    data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Invalid transaction update")
+    return apply_journal_entry_mutations(data.get("items"), data.get("changes"))
 
 @app.post("/journal/add", summary="Add a journal transaction")
 async def add_journal_entry(request: Request):

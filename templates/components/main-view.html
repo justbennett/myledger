@@ -15,6 +15,7 @@
           {{ help_icon("https://hledger.org/1.51/hledger.html#queries", "Query Help") }}
         </div>
         <button type="button" id="add-journal-entry" class="dark">Add Entry</button>
+        <button type="button" id="bulk-edit-transactions" class="dark" hidden>Bulk Edit</button>
       </div>
 
       <div class="account-filter" ></div>
@@ -27,6 +28,51 @@
         <button type="button" id="download-journal" class="dark">Download Journal</button> Opens a file download dialog
      </div>
 </section>
+
+<dialog id="bulk-edit-dialog" aria-labelledby="bulk-edit-title">
+  <form id="bulk-edit-form">
+    <div class="journal-editor-header">
+      <h2 id="bulk-edit-title">Bulk Edit Transactions</h2>
+      <button type="button" class="icon-button" id="bulk-edit-close" aria-label="Close bulk edit" title="Close">×</button>
+    </div>
+    <p id="bulk-edit-selection-count"></p>
+    <fieldset class="bulk-edit-field">
+      <label><input id="bulk-edit-status-enabled" type="checkbox"> Change transaction status</label>
+      <select id="bulk-edit-status">
+        <option value="">Unmarked</option>
+        <option value="!">Pending (!)</option>
+        <option value="*">Cleared (*)</option>
+      </select>
+    </fieldset>
+    <fieldset class="bulk-edit-field">
+      <label><input id="bulk-edit-transaction-tag-enabled" type="checkbox"> Add a transaction tag</label>
+      <div class="bulk-edit-tag-fields">
+        <input id="bulk-edit-transaction-tag-name" type="text" placeholder="Tag name" aria-label="Transaction tag name">
+        <input id="bulk-edit-transaction-tag-value" type="text" placeholder="Tag value" aria-label="Transaction tag value">
+      </div>
+    </fieldset>
+    <fieldset class="bulk-edit-field">
+      <label><input id="bulk-edit-posting-tag-enabled" type="checkbox"> Add a tag to postings with this account</label>
+      <input id="bulk-edit-posting-tag-account" type="text" placeholder="Exact account name">
+      <div class="bulk-edit-tag-fields">
+        <input id="bulk-edit-posting-tag-name" type="text" placeholder="Tag name" aria-label="Posting tag name">
+        <input id="bulk-edit-posting-tag-value" type="text" placeholder="Tag value" aria-label="Posting tag value">
+      </div>
+    </fieldset>
+    <fieldset class="bulk-edit-field">
+      <label><input id="bulk-edit-rename-enabled" type="checkbox"> Rename matching posting accounts</label>
+      <div class="bulk-edit-tag-fields">
+        <input id="bulk-edit-rename-from" type="text" placeholder="Exact current account name">
+        <input id="bulk-edit-rename-to" type="text" placeholder="New account name">
+      </div>
+    </fieldset>
+    <p id="bulk-edit-status-message" role="status" aria-live="polite"></p>
+    <div class="journal-editor-actions">
+      <button type="button" class="dark" id="bulk-edit-cancel">Cancel</button>
+      <button type="submit" class="dark" id="bulk-edit-save">Apply changes</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="journal-download-dialog" aria-labelledby="journal-download-title">
   <form id="journal-download-form">

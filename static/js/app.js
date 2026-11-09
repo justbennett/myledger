@@ -207,32 +207,185 @@ function resetTransactionSelection(table) {
   if (!selectAll) return;
   selectAll.checked = false;
   selectAll.indeterminate = false;
+  updateBulkEditButton();
+}
+
+function getActiveTransactionsTable() {
+  return document.getElementById("register-view-tab").classList.contains("active")
+    ? document.getElementById("register")
+    : document.getElementById("journal-table");
+}
+
+function getSelectedTransactions(table = getActiveTransactionsTable()) {
+  return Array.from(table.querySelectorAll("tbody [data-transaction-select]:checked"))
+    .map((checkbox) => JSON.parse(checkbox.dataset.edit));
+}
+
+function updateBulkEditButton() {
+  const button = document.getElementById("bulk-edit-transactions");
+  if (!button) return;
+  const selectedCount = getSelectedTransactions().length;
+  button.hidden = selectedCount === 0;
+  button.textContent = selectedCount ? `Bulk Edit (${selectedCount})` : "Bulk Edit";
+}
+
+function clearTableSelection(table) {
+  table.querySelectorAll("tbody [data-transaction-select]").forEach((checkbox) => {
+    checkbox.checked = false;
+  });
+  resetTransactionSelection(table);
+}
+
+async function refreshTransactionViews() {
+  try {
+    await Promise.all([loadBalance(), loadRegister(currentAccountFilter), reloadJournal()]);
+  } catch (error) {
+    console.error("Transaction changes were saved, but the views could not be refreshed:", error);
+    window.alert(`Changes were saved, but the views could not be refreshed: ${error.message}`);
+  }
+}
+
+async function saveRegisterStatus(select) {
+  const edit = JSON.parse(select.dataset.edit);
+  const previousStatus = select.dataset.savedStatus;
+  select.disabled = true;
+  try {
+    const response = await fetch("/journal/mutate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Myledger-Request": "fetch" },
+      body: JSON.stringify({ items: [{ edit }], changes: { status: select.value } }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Unable to update transaction status");
+    select.dataset.savedStatus = select.value;
+    updateBulkEditButton();
+    await refreshTransactionViews();
+  } catch (error) {
+    select.value = previousStatus;
+    window.alert(`Status update failed: ${error.message}`);
+  } finally {
+    select.disabled = false;
+  }
 }
 
 document.addEventListener("change", (event) => {
-  const checkbox = event.target;
-  if (!(checkbox instanceof HTMLInputElement)) return;
+  const target = event.target;
+  if (target instanceof HTMLSelectElement && target.matches("[data-register-status]")) {
+    saveRegisterStatus(target);
+    return;
+  }
+  if (!(target instanceof HTMLInputElement)) return;
 
-  const table = checkbox.closest("table");
+  const table = target.closest("table");
   if (!table) return;
+  const otherTable = table.id === "register"
+    ? document.getElementById("journal-table")
+    : document.getElementById("register");
 
-  if (checkbox.matches("[data-select-all]")) {
-    const rowCheckboxes = table.querySelectorAll("tbody [data-transaction-select]");
-    checkbox.checked = rowCheckboxes.length > 0 && checkbox.checked;
+  if (target.matches("[data-select-all]")) {
+    if (target.checked) clearTableSelection(otherTable);
+    const rowCheckboxes = Array.from(table.querySelectorAll("tbody [data-transaction-select]:not(:disabled)"));
+    target.checked = rowCheckboxes.length > 0 && target.checked;
     rowCheckboxes.forEach((rowCheckbox) => {
-      rowCheckbox.checked = checkbox.checked;
+      rowCheckbox.checked = target.checked;
     });
-    checkbox.indeterminate = false;
+    target.indeterminate = false;
+    updateBulkEditButton();
     return;
   }
 
-  if (!checkbox.matches("[data-transaction-select]")) return;
+  if (!target.matches("[data-transaction-select]")) return;
+  if (target.checked) clearTableSelection(otherTable);
   const selectAll = table.querySelector("[data-select-all]");
-  if (!selectAll) return;
-  const rowCheckboxes = Array.from(table.querySelectorAll("tbody [data-transaction-select]"));
+  const rowCheckboxes = Array.from(table.querySelectorAll("tbody [data-transaction-select]:not(:disabled)"));
   const checkedCount = rowCheckboxes.filter((rowCheckbox) => rowCheckbox.checked).length;
   selectAll.checked = rowCheckboxes.length > 0 && checkedCount === rowCheckboxes.length;
   selectAll.indeterminate = checkedCount > 0 && checkedCount < rowCheckboxes.length;
+  updateBulkEditButton();
+});
+
+document.getElementById("journal-view-tab").addEventListener("click", updateBulkEditButton);
+document.getElementById("register-view-tab").addEventListener("click", updateBulkEditButton);
+
+function selectedTransactionEditMetadata() {
+  return getSelectedTransactions();
+}
+
+function openBulkEditDialog() {
+  const selected = selectedTransactionEditMetadata();
+  if (!selected.length) return;
+  document.getElementById("bulk-edit-form").reset();
+  document.getElementById("bulk-edit-selection-count").textContent =
+    `${selected.length} transaction${selected.length === 1 ? "" : "s"} selected. Bulk updates currently apply to one journal file at a time.`;
+  document.getElementById("bulk-edit-status-message").textContent = "";
+  document.getElementById("bulk-edit-dialog").showModal();
+}
+
+document.getElementById("bulk-edit-transactions").addEventListener("click", openBulkEditDialog);
+
+document.getElementById("bulk-edit-close").addEventListener("click", () => {
+  document.getElementById("bulk-edit-dialog").close();
+});
+
+document.getElementById("bulk-edit-cancel").addEventListener("click", () => {
+  document.getElementById("bulk-edit-dialog").close();
+});
+
+document.getElementById("bulk-edit-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const status = document.getElementById("bulk-edit-status-message");
+  const saveButton = document.getElementById("bulk-edit-save");
+  const changes = {};
+  const valueFor = (id) => document.getElementById(id).value.trim();
+
+  try {
+    if (document.getElementById("bulk-edit-status-enabled").checked) {
+      changes.status = document.getElementById("bulk-edit-status").value;
+    }
+    if (document.getElementById("bulk-edit-transaction-tag-enabled").checked) {
+      changes.transaction_tag = {
+        name: valueFor("bulk-edit-transaction-tag-name"),
+        value: valueFor("bulk-edit-transaction-tag-value"),
+      };
+    }
+    if (document.getElementById("bulk-edit-posting-tag-enabled").checked) {
+      changes.posting_tag = {
+        account: valueFor("bulk-edit-posting-tag-account"),
+        name: valueFor("bulk-edit-posting-tag-name"),
+        value: valueFor("bulk-edit-posting-tag-value"),
+      };
+    }
+    if (document.getElementById("bulk-edit-rename-enabled").checked) {
+      changes.rename_account = {
+        from: valueFor("bulk-edit-rename-from"),
+        to: valueFor("bulk-edit-rename-to"),
+      };
+    }
+
+    const items = selectedTransactionEditMetadata().map((edit) => ({ edit }));
+    if (!items.length) throw new Error("Select at least one editable transaction.");
+    if (!Object.keys(changes).length) throw new Error("Select at least one change to apply.");
+    const journals = new Set(items.map((item) => item.edit.journal));
+    if (journals.size > 1) throw new Error("Select transactions from one journal file at a time.");
+
+    saveButton.disabled = true;
+    status.textContent = "Applying changes...";
+    const response = await fetch("/journal/mutate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Myledger-Request": "fetch" },
+      body: JSON.stringify({ items, changes }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Unable to update selected transactions");
+
+    document.getElementById("bulk-edit-dialog").close();
+    clearTableSelection(getActiveTransactionsTable());
+    await refreshTransactionViews();
+  } catch (error) {
+    status.textContent = error.message;
+  } finally {
+    saveButton.disabled = false;
+  }
 });
 
 async function loadRegister(account = null, query = currentJournalSearch) {
@@ -393,12 +546,39 @@ function renderTransactionRow(tx) {
   const checkbox = document.createElement("input");
   checkbox.type = "checkbox";
   checkbox.dataset.transactionSelect = "";
+  if (tx.edit) {
+    const { journal, line_start, line_end, original_hash } = tx.edit;
+    checkbox.dataset.edit = JSON.stringify({ journal, line_start, line_end, original_hash });
+  }
+  else checkbox.disabled = true;
   checkbox.setAttribute("aria-label", `Select transaction ${tx.date} ${tx.description}`);
   selectCell.appendChild(checkbox);
 
   const statusCell = document.createElement("td");
   statusCell.className = "transaction-status";
-  statusCell.textContent = transactionStatus(tx.status);
+  const statusSelect = document.createElement("select");
+  statusSelect.className = "register-status-select";
+  statusSelect.dataset.registerStatus = "";
+  statusSelect.setAttribute("aria-label", `Transaction status for ${tx.date} ${tx.description}`);
+  statusSelect.title = "Set the whole transaction to unmarked, pending, or cleared";
+  statusSelect.dataset.savedStatus = transactionStatus(tx.status);
+  statusSelect.disabled = !tx.edit;
+  if (tx.edit) {
+    const { journal, line_start, line_end, original_hash } = tx.edit;
+    statusSelect.dataset.edit = JSON.stringify({ journal, line_start, line_end, original_hash });
+  }
+  [
+    ["", ""],
+    ["!", "!"],
+    ["*", "*"],
+  ].forEach(([value, label]) => {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    statusSelect.appendChild(option);
+  });
+  statusSelect.value = transactionStatus(tx.status);
+  statusCell.appendChild(statusSelect);
 
   const idCell = document.createElement("td");
   idCell.className = "deEmphasize";
@@ -423,7 +603,7 @@ function renderTransactionRow(tx) {
 
  // New behavior: expand/collapse split rows on click
   tr.addEventListener("click", (event) => {
-  if (event.target.closest("[data-transaction-select]")) return;
+ if (event.target.closest("[data-transaction-select], [data-register-status]")) return;
   if (tr.classList.contains("expanded")) {
     tr.classList.remove("expanded");
     tr.nextElementSibling?.classList.contains("split-row") &&
@@ -738,6 +918,7 @@ function setJournalView(view) {
     const panelId = candidate === "journal" ? "journal-table-panel" : `${candidate}-panel`;
     document.getElementById(panelId).hidden = !selected;
   }
+  updateBulkEditButton();
   if (view === "register") loadRegister(currentAccountFilter);
 }
 
@@ -832,7 +1013,7 @@ function reloadJournal() {
     params.query = currentJournalSearch;
   }
   if (debugMode) console.log("Reloading journal with params:", params);
-  loadJournal(params);
+  return loadJournal(params);
 }
 
 // Initial load

@@ -19,6 +19,11 @@ function renderJournalTableRow(tx, { formatAmount, renderAccount, onEdit } = {})
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.dataset.transactionSelect = "";
+    if (tx.edit) {
+      const { journal, line_start, line_end, original_hash } = tx.edit;
+      checkbox.dataset.edit = JSON.stringify({ journal, line_start, line_end, original_hash });
+    }
+    else checkbox.disabled = true;
     checkbox.setAttribute("aria-label", `Select transaction ${tx.date ?? tx.tdate ?? ""} ${description}`);
     selectCell.appendChild(checkbox);
     row.appendChild(selectCell);
