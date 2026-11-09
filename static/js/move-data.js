@@ -655,7 +655,8 @@ async function checkDataRepositoryStatus() {
       throw new Error(result.detail || 'Unable to check data repository status');
     }
 
-    pushButton.hidden = result.push_enabled !== true;
+    pushButton.hidden =
+      result.push_enabled !== true || !result.available || result.status === 'up_to_date';
 
     if (!result.available) {
       status.textContent = result.message || 'Data repository status is unavailable.';
