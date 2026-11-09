@@ -16,7 +16,7 @@
 <html>
 <head>
   <title>Hledger {{title}}</title>
-  <link rel="stylesheet" href="/static/css/main.css?v=10">
+  <link rel="stylesheet" href="/static/css/main.css?v=12">
   <link rel="icon" type="image/png" href="/static/favicon.ico">
 </head>
 <body data-page="move-data">
@@ -103,9 +103,11 @@
       </div>
     </div>
      </main>
-        {% include '/components/footer.html' %}
+
     <!-- Center the update section-->
-    <div style="display: flex; justify-content: center;">
+    <div class="repository-updates">
+      <hr style="width: 80%; margin: 20px 0;">
+      <h2>Repository Updates</h2>
       <div id="update-section">
         <div class="update-box" aria-labelledby="github-update-title">
           <center><b id="github-update-title">GitHub</b></center>
@@ -122,12 +124,13 @@
           <pre id="data-repository-commits" style="margin: 0;"></pre>
           <p id="data-repository-status" role="status" aria-live="polite">Checking repository status...</p>
           <pre id="data-repository-changes" style="margin: 0;"></pre>
+          <button id="push-data" class="dark" type="button" hidden>Push Data</button>
         </div>
       </div>
     </div>
 
- 
-
+ <!-- Include the footer component -->
+  {% include '/components/footer.html' %}
 
   <!-- Dialogs -->
     <dialog id="rules-editor" aria-labelledby="rules-editor-title">
@@ -197,6 +200,6 @@
     </dialog>
 
     <script src="/static/js/journal-table.js?v=1"></script>
-    <script src="/static/js/move-data.js?v=14"></script>
+    <script src="/static/js/move-data.js?v=15"></script>
 </body>
 </html>

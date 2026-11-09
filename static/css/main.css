@@ -39,7 +39,7 @@ body[data-theme="dark"] {
   --theme-backdrop: rgb(2 6 23 / 75%);
   --theme-header-bg: #020817;
   --theme-header-fg: #f8fafc;
-  --theme-button-bg: #0f172a;
+  --theme-button-bg: #334155;
   --theme-button-fg: #f8fafc;
   color-scheme: dark;
 }
@@ -1092,8 +1092,20 @@ section h2 {
   flex-wrap: wrap;
   justify-content: center;
   width: 100%;
-  margin: 10px;
-  margin-top: 2rem;
+}
+
+.repository-updates {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.repository-updates h2 {
+  width: 100%;
+  align-self: stretch;
+  text-align: center;
+  margin-bottom: 0;
 }
 
 .update-box {

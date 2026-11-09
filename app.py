@@ -955,6 +955,7 @@ def logout(request: Request):
 @app.get("/data-git-status", summary="Check financial data repository status")
 def data_git_status():
     repo = LEDGER_DATA_DIR
+    push_enabled = os.environ.get("MYLEDGER_DATA_PUSH_ENABLED", "").lower() == "true"
 
     def git(*args):
         return subprocess.run(
@@ -1007,6 +1008,7 @@ def data_git_status():
 
         return {
             "available": True,
+            "push_enabled": push_enabled,
             "branch": branch,
             "status": status,
             "working_changes": changes,
@@ -1024,6 +1026,7 @@ def data_git_status():
     except Exception as error:
         return {
             "available": False,
+            "push_enabled": push_enabled,
             "status": "error",
             "message": str(error),
         }
@@ -1148,7 +1151,7 @@ def update_status():
     if not os.path.exists(deploy_script):
         return {
             "available": False,
-            "message": "This environment has not been configured for updates.",
+            "message": "This environment has not been configured for GitHub updates.",
         }
     
     result = subprocess.run(

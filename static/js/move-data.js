@@ -644,7 +644,9 @@ async function checkDataRepositoryStatus() {
   const commits = document.getElementById('data-repository-commits');
   const status = document.getElementById('data-repository-status');
   const changes = document.getElementById('data-repository-changes');
+  const pushButton = document.getElementById('push-data');
 
+  pushButton.hidden = true;
   try {
     const response = await fetch('/data-git-status');
     const result = await response.json();
@@ -652,6 +654,8 @@ async function checkDataRepositoryStatus() {
     if (!response.ok) {
       throw new Error(result.detail || 'Unable to check data repository status');
     }
+
+    pushButton.hidden = result.push_enabled !== true;
 
     if (!result.available) {
       status.textContent = result.message || 'Data repository status is unavailable.';
@@ -673,6 +677,38 @@ async function checkDataRepositoryStatus() {
     status.textContent = `Repository status check failed: ${error.message}`;
   }
 }
+
+document.getElementById('push-data')?.addEventListener('click', async () => {
+  const button = document.getElementById('push-data');
+  const status = document.getElementById('data-repository-status');
+
+  if (!confirm(
+    'Push data changes to the repository?\n\n' +
+    'This may commit and push all changes in the data repository.'
+  )) {
+    return;
+  }
+
+  button.disabled = true;
+  status.textContent = 'Pushing data changes...';
+
+  try {
+    const response = await fetch('/data-git-push', { method: 'POST' });
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.detail || 'Unable to push data changes');
+    }
+
+    await checkDataRepositoryStatus();
+    status.textContent = result.message || 'Data changes pushed successfully.';
+  } catch (error) {
+    console.error('Data repository push failed:', error);
+    status.textContent = `Data push failed: ${error.message}`;
+  } finally {
+    button.disabled = false;
+  }
+});
 
 document.getElementById('update-my-ledger')?.addEventListener(
   'click',
