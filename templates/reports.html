@@ -78,7 +78,8 @@
             <div class="report-filter-stack">
               <label>
                 Account filter
-                <input type="text" name="account" value="{{ report_form.account }}" placeholder="assets:cash or liabilities:credit-card">
+                <input type="text" name="account" list="report-account-suggestions" value="{{ report_form.account }}" placeholder="assets:cash or liabilities:credit-card">
+                <datalist id="report-account-suggestions"></datalist>
               </label>
 
               <label>
@@ -767,6 +768,7 @@
       const journalSelect = document.getElementById("journal-select");
       const journalToggle = document.getElementById("journal-toggle");
       const reportAccountInput = document.querySelector('input[name="account"]');
+      const reportAccountSuggestions = document.getElementById("report-account-suggestions");
       const reportJournalsInput = document.getElementById("report-selected-journals");
 
       const syncSelectedJournalsInput = () => {
@@ -836,6 +838,26 @@
         return li;
       };
 
+      const updateAccountSuggestions = (nodes) => {
+        if (!reportAccountSuggestions) return;
+
+        reportAccountSuggestions.replaceChildren();
+        const accounts = new Set();
+        const addAccounts = (accountNodes) => {
+          accountNodes.forEach((node) => {
+            if (node.account) accounts.add(node.account);
+            if (node.accounts) addAccounts(node.accounts);
+          });
+        };
+        addAccounts(nodes);
+
+        accounts.forEach((account) => {
+          const option = document.createElement("option");
+          option.value = account;
+          reportAccountSuggestions.appendChild(option);
+        });
+      };
+
       const updateIncludedJournals = () => {
         const container = document.getElementById("included-journals");
         if (!container) return;
@@ -865,6 +887,7 @@
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const data = await response.json();
 
+          updateAccountSuggestions(data);
           accountContainer.innerHTML = "";
           data.forEach((node) => {
             accountContainer.appendChild(renderAccount(node));
