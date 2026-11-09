@@ -177,6 +177,7 @@ def build_register_transactions(rows, account_filter=None):
 
         transactions.append({
             "id": txid,
+            "status": primary.get("pstatus", "Unmarked"),
             "date": date,
             "description": description,
             "account": primary["paccount"],

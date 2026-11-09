@@ -13,6 +13,22 @@ function renderJournalTableRow(tx, { formatAmount, renderAccount, onEdit } = {})
   const row = document.createElement("tr");
   row.classList.add("clickable-row");
 
+  if (!previewMode) {
+    const selectCell = document.createElement("td");
+    selectCell.className = "transaction-select-cell";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.dataset.transactionSelect = "";
+    checkbox.setAttribute("aria-label", `Select transaction ${tx.date ?? tx.tdate ?? ""} ${description}`);
+    selectCell.appendChild(checkbox);
+    row.appendChild(selectCell);
+
+    const statusCell = document.createElement("td");
+    statusCell.className = "transaction-status";
+    statusCell.textContent = transactionStatus(tx.status ?? tx.tstatus);
+    row.appendChild(statusCell);
+  }
+
   const values = [
     tx.date ?? tx.tdate ?? "",
     description,
@@ -57,7 +73,7 @@ function renderJournalTableRow(tx, { formatAmount, renderAccount, onEdit } = {})
   if (!previewMode) detailRow.appendChild(document.createElement("td"));
 
   const detailCell = document.createElement("td");
-  detailCell.colSpan = 4;
+  detailCell.colSpan = previewMode ? 4 : 6;
   const details = document.createElement("div");
   details.className = "details-row";
 
@@ -85,10 +101,16 @@ function renderJournalTableRow(tx, { formatAmount, renderAccount, onEdit } = {})
   detailRow.appendChild(detailCell);
 
   row.addEventListener("click", (event) => {
-    if (event.target.closest(".filter-icon")) return;
+    if (event.target.closest(".filter-icon, [data-transaction-select]")) return;
     detailRow.hidden = !detailRow.hidden;
   });
 
   fragment.append(row, detailRow);
   return fragment;
+}
+
+function transactionStatus(status) {
+  if (status === "*" || status === "Cleared") return "*";
+  if (status === "!" || status === "Pending") return "!";
+  return "";
 }

@@ -65,8 +65,40 @@
         <label for="journal-destination">Journal</label>
         <select id="journal-destination" required></select>
       </div>
-      <label for="journal-entry-content">Remember two spaces must come after the account name before the ammount.</label>
-      <textarea id="journal-entry-content" required spellcheck="false"></textarea>
+      <div class="journal-entry-fields">
+        <div class="journal-entry-header-fields">
+          <input id="journal-entry-date" type="date">
+          <select id="journal-entry-status">
+            <option value="">Unmarked</option>
+            <option value="!">Pending (!)</option>
+            <option value="*">Cleared (*)</option>
+          </select>
+        </div>
+        <div class="journal-entry-description-fields">
+          <label for="journal-entry-description">
+            Description
+            <input id="journal-entry-description" type="text">
+          </label>
+          <label for="journal-entry-comment">
+            Comment
+            <input id="journal-entry-comment" type="text" placeholder="Optional">
+          </label>
+        </div>
+        <div class="journal-entry-postings-section">
+          <div class="journal-entry-postings-header">
+            <span>Posting lines </span>
+          </div>
+          <div id="journal-entry-postings" class="journal-entry-postings"></div>
+          <em>Amounts are separated from account names by two spaces in the transaction.</em>
+          <button type="button" class="dark small-button" id="journal-entry-add-posting">Add Account</button>
+        </div>
+      </div>
+      <label for="journal-entry-content">Transaction Text (<em>The form above updates this text. Make any additional edits before submitting.</em>)</label>
+      <textarea id="journal-entry-content" rows="4" required spellcheck="false"></textarea>
+      <div>
+        <strong>Transaction preview</strong>
+        <pre id="journal-entry-preview" class="journal-entry-preview" aria-live="polite"></pre>
+      </div>
       <p id="journal-editor-status" role="status" aria-live="polite"></p>
       <div class="journal-editor-actions">
         <button type="button" class="dark" id="journal-editor-cancel">Cancel</button>

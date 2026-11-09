@@ -202,11 +202,46 @@ document.getElementById("balance-download-form").addEventListener("submit", asyn
   }
 });
 
+function resetTransactionSelection(table) {
+  const selectAll = table.querySelector("[data-select-all]");
+  if (!selectAll) return;
+  selectAll.checked = false;
+  selectAll.indeterminate = false;
+}
+
+document.addEventListener("change", (event) => {
+  const checkbox = event.target;
+  if (!(checkbox instanceof HTMLInputElement)) return;
+
+  const table = checkbox.closest("table");
+  if (!table) return;
+
+  if (checkbox.matches("[data-select-all]")) {
+    const rowCheckboxes = table.querySelectorAll("tbody [data-transaction-select]");
+    checkbox.checked = rowCheckboxes.length > 0 && checkbox.checked;
+    rowCheckboxes.forEach((rowCheckbox) => {
+      rowCheckbox.checked = checkbox.checked;
+    });
+    checkbox.indeterminate = false;
+    return;
+  }
+
+  if (!checkbox.matches("[data-transaction-select]")) return;
+  const selectAll = table.querySelector("[data-select-all]");
+  if (!selectAll) return;
+  const rowCheckboxes = Array.from(table.querySelectorAll("tbody [data-transaction-select]"));
+  const checkedCount = rowCheckboxes.filter((rowCheckbox) => rowCheckbox.checked).length;
+  selectAll.checked = rowCheckboxes.length > 0 && checkedCount === rowCheckboxes.length;
+  selectAll.indeterminate = checkedCount > 0 && checkedCount < rowCheckboxes.length;
+});
+
 async function loadRegister(account = null, query = currentJournalSearch) {
   const transactions = await journalDataService.fetchRegister({ account, query });
 
-  const tbody = document.querySelector("#register tbody");
+  const table = document.getElementById("register");
+  const tbody = table.querySelector("tbody");
   tbody.innerHTML = "";
+  resetTransactionSelection(table);
 
   for (const tx of transactions) {
     tbody.appendChild(renderTransactionRow(tx));
@@ -219,8 +254,10 @@ async function loadJournal(filters = {}) {
     if (debugMode) console.log("Loading journal with params:", filters);
     const data = await journalDataService.fetchJournal(filters);
 
-    const tbody = document.querySelector("#journal-table tbody");
+    const table = document.getElementById("journal-table");
+    const tbody = table.querySelector("tbody");
     tbody.innerHTML = "";
+    resetTransactionSelection(table);
 
     for (const tx of data) {
       tbody.appendChild(renderJournalRow(tx));
@@ -351,21 +388,42 @@ function renderTransactionRow(tx) {
   tr.className = "clickable-row";
   tr.dataset.txid = tx.id;
 
-  tr.innerHTML = `
-    <td class="deEmphasize">${tx.id}</td>
-    <td>${tx.date}</td>
-    <td>${tx.description}</td>
-    <td>${tx.account}</td>
-    <td class="amount">${formatAmount(tx.amount)}</td>
-    <td class="balance">${formatAmount(tx.balance)}</td>
-  `;
+  const selectCell = document.createElement("td");
+  selectCell.className = "transaction-select-cell";
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.dataset.transactionSelect = "";
+  checkbox.setAttribute("aria-label", `Select transaction ${tx.date} ${tx.description}`);
+  selectCell.appendChild(checkbox);
+
+  const statusCell = document.createElement("td");
+  statusCell.className = "transaction-status";
+  statusCell.textContent = transactionStatus(tx.status);
+
+  const idCell = document.createElement("td");
+  idCell.className = "deEmphasize";
+  idCell.textContent = tx.id;
+  const dateCell = document.createElement("td");
+  dateCell.textContent = tx.date;
+  const descriptionCell = document.createElement("td");
+  descriptionCell.textContent = tx.description;
+  const accountCell = document.createElement("td");
+  accountCell.textContent = tx.account;
+  const amountCell = document.createElement("td");
+  amountCell.className = "amount";
+  amountCell.textContent = formatAmount(tx.amount);
+  const balanceCell = document.createElement("td");
+  balanceCell.className = "balance";
+  balanceCell.textContent = formatAmount(tx.balance);
+  tr.append(selectCell, statusCell, idCell, dateCell, descriptionCell, accountCell, amountCell, balanceCell);
 
  // tr.addEventListener("click", () => toggleDetails(tx.id));
  // return tr;
  // )
 
  // New behavior: expand/collapse split rows on click
-  tr.addEventListener("click", () => {
+  tr.addEventListener("click", (event) => {
+  if (event.target.closest("[data-transaction-select]")) return;
   if (tr.classList.contains("expanded")) {
     tr.classList.remove("expanded");
     tr.nextElementSibling?.classList.contains("split-row") &&
@@ -403,6 +461,145 @@ function renderJournalRow(tx) {
   });
 }
 
+function getJournalEntryFields() {
+  const postings = Array.from(document.querySelectorAll(".journal-entry-posting-row"))
+    .map((row) => {
+      const account = row.querySelector(".journal-entry-account-input").value.trim();
+      const amount = formatJournalEntryAmount(row.querySelector(".journal-entry-amount-input").value);
+      return account ? `${account}${amount ? `  ${amount}` : ""}` : amount;
+    })
+    .filter((posting) => posting);
+  const date = document.getElementById("journal-entry-date").value;
+  const status = document.getElementById("journal-entry-status").value;
+  const description = document.getElementById("journal-entry-description").value.trim();
+  const comment = document.getElementById("journal-entry-comment").value.trim();
+
+  const header = `${date}${date ? " " : ""}${status ? `${status} ` : ""}${description}${comment ? `  ; ${comment}` : ""}`;
+  return [header, ...postings.map((posting) => `    ${posting.trim()}`)].join("\n");
+}
+
+function formatJournalEntryAmount(value) {
+  const amount = value.trim();
+  const dollarAmount = amount.match(/^\s*(?:([+-]?)\s*\$\s*|\$\s*([+-]?)\s*)(\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)\s*$/);
+  if (dollarAmount) return `$${dollarAmount[1] || dollarAmount[2] || ""}${dollarAmount[3]}`;
+
+  const numericAmount = amount.match(/^([+-]?)(\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)$/);
+  return numericAmount ? `$${numericAmount[1]}${numericAmount[2]}` : amount;
+}
+
+function setJournalEntryFields(content) {
+  const [header = "", ...lines] = content.replace(/\r\n?/g, "\n").split("\n");
+  const headerMatch = header.match(/^(\d{4}-\d{2}-\d{2})(?:\s+(.*))?$/);
+  const dateInput = document.getElementById("journal-entry-date");
+  const statusInput = document.getElementById("journal-entry-status");
+  const descriptionInput = document.getElementById("journal-entry-description");
+  const commentInput = document.getElementById("journal-entry-comment");
+
+  if (headerMatch) {
+    dateInput.value = headerMatch[1];
+    let headerText = headerMatch[2] || "";
+    const statusMatch = headerText.match(/^([*!])(?:\s+|$)/);
+    statusInput.value = statusMatch ? statusMatch[1] : "";
+    if (statusMatch) headerText = headerText.slice(statusMatch[0].length);
+    const commentIndex = headerText.indexOf(";");
+    descriptionInput.value = (commentIndex < 0 ? headerText : headerText.slice(0, commentIndex)).trim();
+    commentInput.value = commentIndex < 0 ? "" : headerText.slice(commentIndex + 1).trim();
+  } else {
+    dateInput.value = "";
+    statusInput.value = "";
+    descriptionInput.value = "";
+    commentInput.value = "";
+  }
+
+  const postings = lines
+    .filter((line) => /^\s+\S/.test(line))
+    .map((line) => {
+      const posting = line.trimStart();
+      const amountSeparator = posting.search(/[ \t]{2,}/);
+      if (amountSeparator < 0) return { account: posting, amount: "" };
+      return {
+        account: posting.slice(0, amountSeparator).trimEnd(),
+        amount: posting.slice(amountSeparator).trim(),
+      };
+    });
+  renderJournalEntryPostings(postings.length >= 2 ? postings : [...postings, ...Array(Math.max(0, 2 - postings.length)).fill("")]);
+}
+
+function renderJournalEntryPostings(postings) {
+  const container = document.getElementById("journal-entry-postings");
+  container.replaceChildren();
+  postings.forEach((posting, index) => {
+    const row = document.createElement("div");
+    row.className = "journal-entry-posting-row";
+
+    const label = document.createElement("label");
+    label.className = "journal-entry-account-label";
+    label.textContent = `Account ${index + 1}`;
+
+    const accountInput = document.createElement("input");
+    accountInput.type = "text";
+    accountInput.className = "journal-entry-account-input";
+    accountInput.value = typeof posting === "string" ? posting : posting.account;
+    accountInput.placeholder = "Account name";
+    accountInput.setAttribute("aria-label", `Account ${index + 1} name`);
+
+    const amountInput = document.createElement("input");
+    amountInput.type = "text";
+    amountInput.className = "journal-entry-amount-input";
+    const rawAmount = typeof posting === "string" ? "" : posting.amount;
+    const dollarAmount = rawAmount.match(/^\s*(?:([+-]?)\s*\$\s*|\$\s*([+-]?)\s*)(\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)\s*$/);
+    amountInput.value = dollarAmount
+      ? `${dollarAmount[1] || dollarAmount[2] || ""}${dollarAmount[3]}`
+      : rawAmount;
+    amountInput.placeholder = "Amount";
+    amountInput.inputMode = "decimal";
+    amountInput.setAttribute("aria-label", `Amount for account ${index + 1}`);
+
+    const amountField = document.createElement("span");
+    amountField.className = "journal-entry-amount-field";
+    const currencySymbol = document.createElement("span");
+    currencySymbol.className = "journal-entry-currency-symbol";
+    currencySymbol.textContent = "$";
+    currencySymbol.hidden = Boolean(rawAmount && !dollarAmount && !/^[+-]?(?:\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)$/.test(rawAmount));
+    amountInput.addEventListener("input", () => {
+      const isDollarAmount = /^[+-]?(?:\d+(?:,\d{3})*(?:\.\d+)?|\.\d+)$/.test(amountInput.value.trim());
+      currencySymbol.hidden = Boolean(amountInput.value.trim()) && !isDollarAmount;
+    });
+    amountField.append(currencySymbol, amountInput);
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "icon-button";
+    removeButton.textContent = "×";
+    removeButton.title = `Remove account ${index + 1}`;
+    removeButton.setAttribute("aria-label", `Remove account ${index + 1}`);
+    removeButton.disabled = postings.length <= 2;
+    removeButton.addEventListener("click", () => {
+      renderJournalEntryPostings(
+        Array.from(container.querySelectorAll(".journal-entry-posting-row"))
+            .map((postingRow) => ({
+              account: postingRow.querySelector(".journal-entry-account-input").value,
+              amount: postingRow.querySelector(".journal-entry-amount-input").value,
+            }))
+            .filter((_, postingIndex) => postingIndex !== index),
+        );
+    });
+
+    row.append(label, accountInput, amountField, removeButton);
+    container.appendChild(row);
+  });
+}
+
+function updateJournalEntryPreview() {
+  document.getElementById("journal-entry-preview").textContent =
+    document.getElementById("journal-entry-content").value;
+}
+
+function updateJournalEntryFromFields() {
+  document.getElementById("journal-entry-content").value = getJournalEntryFields();
+  updateJournalEntryPreview();
+}
+
 function openJournalEditor(edit) {
   journalEditorMode = "edit";
   activeJournalEdit = edit;
@@ -411,6 +608,8 @@ function openJournalEditor(edit) {
   document.getElementById("journal-destination").disabled = true;
   document.getElementById("journal-editor-save").textContent = "Save entry";
   document.getElementById("journal-entry-content").value = edit.content;
+  setJournalEntryFields(edit.content);
+  updateJournalEntryPreview();
   document.getElementById("journal-editor-status").textContent = "";
   document.getElementById("journal-editor-save").disabled = false;
   document.getElementById("journal-editor").showModal();
@@ -451,8 +650,9 @@ async function openAddJournalEntry() {
     document.getElementById("journal-editor-title").textContent = "Add Journal Entry";
     document.getElementById("journal-editor-destination").hidden = false;
     document.getElementById("journal-editor-save").textContent = "Add entry";
-    document.getElementById("journal-entry-content").value =
-      `${date} description ; comment\n    account1 $AMT\n    account2 $AMT`;
+    setJournalEntryFields(`${date} Description\n    account1  $1\n    account2  $-1`);
+    document.getElementById("journal-entry-content").value = getJournalEntryFields();
+    updateJournalEntryPreview();
     saveButton.disabled = false;
     document.getElementById("journal-editor").showModal();
   } catch (error) {
@@ -464,6 +664,27 @@ async function openAddJournalEntry() {
 }
 
 document.getElementById("add-journal-entry").addEventListener("click", openAddJournalEntry);
+
+document.getElementById("journal-entry-add-posting").addEventListener("click", () => {
+  const postings = Array.from(document.querySelectorAll(".journal-entry-posting-row"))
+    .map((row) => ({
+      account: row.querySelector(".journal-entry-account-input").value,
+      amount: row.querySelector(".journal-entry-amount-input").value,
+    }));
+  renderJournalEntryPostings([...postings, ""]);
+  updateJournalEntryFromFields();
+});
+
+document.querySelector(".journal-entry-fields").addEventListener("input", updateJournalEntryFromFields);
+document.querySelector(".journal-entry-fields").addEventListener("change", updateJournalEntryFromFields);
+
+document.getElementById("journal-entry-postings").addEventListener("click", (event) => {
+  if (event.target.closest(".journal-entry-posting-row") && event.target.closest("button")) {
+    updateJournalEntryFromFields();
+  }
+});
+
+document.getElementById("journal-entry-content").addEventListener("input", updateJournalEntryPreview);
 
 document.getElementById("journal-editor-close").addEventListener("click", () => {
   document.getElementById("journal-editor").close();
@@ -547,7 +768,7 @@ function renderSplitRows(tx) {
   if (tx.other_accounts.length) {
     return tx.other_accounts.map((o, index) => `
       <tr class="split-row">
-        <td></td><td></td>
+        <td></td><td></td><td></td><td></td>
         <td class="comment">${index === 0 && tx.comment ? tx.comment : ""}</td>
         <td class="account split-account">↳ ${o.account}</td>
         <td class="amount">${formatAmount(o.amount)}</td>
@@ -558,7 +779,7 @@ function renderSplitRows(tx) {
     // only comment
     return `
       <tr class="split-row">
-        <td></td><td></td>
+        <td></td><td></td><td></td><td></td>
         <td class="comment">${tx.comment}</td>
         <td class="account split-account"></td>
         <td class="amount"></td>

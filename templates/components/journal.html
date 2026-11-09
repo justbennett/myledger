@@ -2,6 +2,10 @@
         <table id="{{ journal_table_id | default('journal-table') }}">
           <thead>
             <tr>
+              {% if journal_show_actions | default(true) %}
+              <th class="transaction-select-column"><input type="checkbox" data-select-all aria-label="Select all journal transactions"></th>
+              <th>Status</th>
+              {% endif %}
               <th>Date</th>
               <th>Description</th>
               <th>Account</th>
