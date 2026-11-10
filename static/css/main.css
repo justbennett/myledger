@@ -192,6 +192,53 @@ table {
   table-layout: fixed;
 }
 
+#journal-table,
+#register {
+  table-layout: auto;
+}
+
+#journal-table th:nth-child(1),
+#journal-table tbody > tr:not(.journal-detail) td:nth-child(1),
+#journal-table th:nth-child(2),
+#journal-table tbody > tr:not(.journal-detail) td:nth-child(2),
+#journal-table th:nth-child(3),
+#journal-table tbody > tr:not(.journal-detail) td:nth-child(3),
+#journal-table th:nth-child(6),
+#journal-table tbody > tr:not(.journal-detail) td:nth-child(6),
+#journal-table th:nth-child(7),
+#journal-table tbody > tr:not(.journal-detail) td:nth-child(7),
+#register th:nth-child(1),
+#register td:nth-child(1),
+#register th:nth-child(2),
+#register td:nth-child(2),
+#register th:nth-child(3),
+#register td:nth-child(3),
+#register th:nth-child(4),
+#register td:nth-child(4),
+#register th:nth-child(7),
+#register td:nth-child(7),
+#register th:nth-child(8),
+#register td:nth-child(8) {
+  width: 1%;
+  white-space: nowrap;
+}
+
+#journal-table th:nth-child(4),
+#journal-table tbody > tr:not(.journal-detail) td:nth-child(4),
+#journal-table th:nth-child(5),
+#journal-table tbody > tr:not(.journal-detail) td:nth-child(5) {
+  width: 35%;
+  overflow-wrap: anywhere;
+}
+
+#register th:nth-child(5),
+#register tbody > tr td:nth-child(5),
+#register th:nth-child(6),
+#register tbody > tr td:nth-child(6) {
+  width: 35%;
+  overflow-wrap: anywhere;
+}
+
 th,
 td {
   padding: .5rem;
